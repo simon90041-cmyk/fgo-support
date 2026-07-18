@@ -147,15 +147,16 @@
   .bv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
   .bv-slot{display:flex;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px}
   .bv-thumb{display:flex;flex-direction:column;align-items:center;gap:4px;width:46px;flex-shrink:0}
-  .bv-face{width:46px;height:46px;border-radius:6px;background:#000;object-fit:cover}
+  .bv-face{width:46px;height:46px;border-radius:6px;background:#000;object-fit:cover;cursor:help}
   .bv-ce{position:relative;width:32px;height:32px}
-  .bv-ce img{width:32px;height:32px;border-radius:5px;background:#000;object-fit:cover;border:1px solid var(--accent2)}
+  .bv-ce img{width:32px;height:32px;border-radius:5px;background:#000;object-fit:cover;border:1px solid var(--accent2);cursor:help}
   .bv-ce .mlb{position:absolute;right:-6px;bottom:-6px;background:var(--gold);color:#1a1400;font-size:9px;font-weight:800;line-height:1;padding:2px 3px;border-radius:6px;border:1px solid #1a1400}
   .bv-info{min-width:0;font-size:11px}.bv-info .bv-slabel{color:var(--accent);font-weight:600}
   .bv-info .bv-sname{color:var(--gold2);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .bv-info .bv-cls{color:var(--muted);text-transform:capitalize}.bv-info .bv-stat{color:var(--muted)}
   .lv100{color:#f0b429;font-weight:800}/* Lv100+ 金色 */
   .lv120{font-weight:800;background:linear-gradient(90deg,#ff9a3d,#ff5e7a);-webkit-background-clip:text;background-clip:text;color:transparent;filter:saturate(1.1)}/* Lv120 滿級橙金→桃 漸層 */
+  .np5{font-weight:800;background:linear-gradient(90deg,#4fb8ff,#b07dff);-webkit-background-clip:text;background-clip:text;color:transparent;filter:saturate(1.1)}/* NP5 滿寶 藍→紫 漸層 */
   .empty{text-align:center;color:var(--muted);padding:44px;font-size:14px}
   .hint{font-size:11px;color:var(--muted);margin-top:4px}
   .adv-group{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:10px}
@@ -462,6 +463,8 @@ function servantLabel(s){if(!s)return"";const p=nameByLang(s);const en=s.en;retu
 function pickServant(s){return{id:s.id,collectionNo:s.collectionNo,ja:s.ja,en:s.en,cn:s.cn,tw:s.tw,className:s.className,rarity:s.rarity,face:s.face};}
 /* 從者等級高亮：Lv120＝滿級橙金漸層，Lv100+＝金色 */
 function lvHtml(level){const l=level||0;const txt="Lv"+(level||"?");return l>=120?`<span class="lv120">${txt}</span>`:l>=100?`<span class="lv100">${txt}</span>`:txt;}
+/* 寶具等級：NP5（滿寶）藍紫漸層高亮 */
+function npHtml(np){return (+np)>=5?`<span class="np5">NP5</span>`:("NP"+np);}
 async function loadServants(){try{
   const regions=[["JP","ja"],["NA","en"],["CN","cn"],["TW","tw"]];  // JP 最完整→提供 id/職階/稀有度/立繪
   const lists=await Promise.all(regions.map(([r])=>fetch(`https://api.atlasacademy.io/export/${r}/basic_servant.json`).then(x=>x.json())));
@@ -542,7 +545,7 @@ function renderBoardTabs(){
 function renderBoardGrid(){
   const bd=boardDraft[currentBoard]||{};
   $("boardGrid").innerHTML=CLASS_SLOTS.map(sl=>{const s=bd[sl.key];const lbl=slotLabelOf(sl);
-    if(s)return `<div class="slot filled ${editingKey===sl.key?'editing':''}" data-key="${sl.key}"><div class="slabel">${lbl}</div><img src="${s.servant.face}" onerror="this.style.visibility='hidden'"><div class="sname">${servantLabel(s.servant)}</div><div class="smini">NP${s.np}·${lvHtml(s.level)}</div></div>`;
+    if(s)return `<div class="slot filled ${editingKey===sl.key?'editing':''}" data-key="${sl.key}"><div class="slabel">${lbl}</div><img src="${s.servant.face}" onerror="this.style.visibility='hidden'"><div class="sname">${servantLabel(s.servant)}</div><div class="smini">${npHtml(s.np)}·${lvHtml(s.level)}</div></div>`;
     return `<div class="slot ${editingKey===sl.key?'editing':''}" data-key="${sl.key}"><div class="slabel">${lbl}</div><div class="plus">＋</div></div>`;}).join("");
   document.querySelectorAll("#boardGrid .slot").forEach(el=>el.onclick=()=>openEditor(el.dataset.key));
 }
@@ -628,7 +631,7 @@ function refreshDB(){$("dbCount").textContent=load().length;
 function slotPassFilter(sl){if(activeBoard.size&&!activeBoard.has(sl.boardKey))return false;if(activeClass.size&&![...activeClass].some(c=>classMatch(sl.servant.className,c)))return false;if(activeRar.size&&!activeRar.has(String(sl.servant.rarity)))return false;return true;}
 /* 複選晶片列：「全部」= 清空選取；其餘可多選（toggle） */
 function chipStrip(id,items,set,isRar){const el=$(id);if(!el)return;
-  el.innerHTML=items.map(it=>{const active=it.key===""?set.size===0:set.has(it.key);return `<div class="clschip ${isRar?'rar ':''}${active?'active':''}" data-k="${it.key}">${it.label}</div>`;}).join("");
+  el.innerHTML=items.map(it=>{const active=it.key===""?set.size===0:set.has(it.key);return `<div class="clschip ${isRar&&it.key!==""?'rar ':''}${active?'active':''}" data-k="${it.key}">${it.label}</div>`;}).join("");
   el.querySelectorAll(".clschip").forEach(c=>c.onclick=()=>{const k=c.dataset.k;if(k==="")set.clear();else if(set.has(k))set.delete(k);else set.add(k);renderStrips();showAll();});}
 function renderStrips(){
   chipStrip("clsstrip",[{key:"",label:t("strip_all")},...CLASSES_15.map(c=>({key:c.key,label:classLabel(c.key)}))],activeClass);
@@ -652,14 +655,14 @@ function boardHtml(e){
     return `<div class="bv-group"><div class="bv-gl">${boardLabelOf(b)}</div><div class="bv-grid">${gs.map(sl=>`
       <div class="bv-slot">
         <div class="bv-thumb">
-          <img class="bv-face" src="${sl.servant.face}" onerror="this.style.visibility='hidden'">
-          ${sl.ce?`<div class="bv-ce"><img src="${sl.ce.face}" onerror="this.style.visibility='hidden'">${sl.ce.lb===4?'<span class="mlb">'+(LANG==='ja'?'極':LANG==='en'?'M':'滿')+'</span>':''}</div>`:''}
+          <img class="bv-face" src="${sl.servant.face}" title="${escapeHtml(servantLabel(sl.servant))}" onerror="this.style.visibility='hidden'">
+          ${sl.ce?`<div class="bv-ce"><img src="${sl.ce.face}" title="${escapeHtml(ceName(sl.ce)+ceLbTxt(sl.ce.lb))}" onerror="this.style.visibility='hidden'">${sl.ce.lb===4?'<span class="mlb">'+(LANG==='ja'?'極':LANG==='en'?'M':'滿')+'</span>':''}</div>`:''}
         </div>
         <div class="bv-info">
           <div class="bv-slabel">${sl.slotLabel}</div>
           <div class="bv-sname">${servantLabel(sl.servant)}</div>
           <div class="bv-cls">${"★".repeat(sl.servant.rarity)} · ${sl.servant.className}</div>
-          <div class="bv-stat">NP${sl.np} · ${lvHtml(sl.level)} · ${sl.skills.join('/')}</div>
+          <div class="bv-stat">${npHtml(sl.np)} · ${lvHtml(sl.level)} · ${sl.skills.join('/')}</div>
           ${sl.as&&sl.as.some(x=>x>0)?`<div class="bv-stat">AS ${sl.as.join('/')}</div>`:''}
           ${sl.ce?`<div class="bv-stat" style="color:var(--gold2)">${escapeHtml(ceName(sl.ce))}${ceLbTxt(sl.ce.lb)}</div>`:''}
         </div></div>`).join("")}</div></div>`;}).join("");
