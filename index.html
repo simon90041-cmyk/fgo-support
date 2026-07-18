@@ -667,7 +667,6 @@ function renderList(items,desc,keepPage){
     return `<div class="entry${mine?' mine':''}"><div class="top">
       <span class="code" title="copy" onclick="copyCode('${e.friendCode}')">${e.friendCode}</span>
       <span class="badge srv">${srvName(e.server)}</span>
-      <span class="badge">${slotsOf(e).length} ${t("unit_slots")}</span>
       ${mine?`<span class="badge mine-badge">⭐ ${t("your_entry")}</span>`:''}
       <button class="like-btn${liked?' liked':''}" onclick="likeEntry('${e.id}')" title="${t("like")}">👍 <span>${e.likes||0}</span></button>
       <span class="entry-actions"><button class="more-btn" onclick="toggleMenu(event,this)" title="更多">⋯</button><div class="more-menu">${mine?`<div class="mi del" onclick="del('${e.id}')">🗑 ${t("btn_del")}</div>`:''}<div class="mi" onclick="block('${e.friendCode}')">🚫 ${t("bl_block")}</div></div></span></div>
