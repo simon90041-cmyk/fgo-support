@@ -99,8 +99,15 @@
   .badge{font-size:11px;padding:2px 9px;border-radius:20px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
   .badge.srv{background:color-mix(in srgb,var(--accent) 20%,transparent);border-color:var(--accent);color:var(--text)}
   .entry .del{margin-left:auto;color:var(--muted);cursor:pointer;font-size:14px}.entry .del:hover{color:var(--danger)}
-  .entry-actions{margin-left:auto;display:flex;gap:14px}
+  .entry-actions{margin-left:auto;position:relative}
   .act{color:var(--muted);cursor:pointer;font-size:14px}.act:hover{color:var(--danger)}
+  .more-btn{background:none;border:none;color:var(--muted);font-size:22px;line-height:1;cursor:pointer;padding:0 6px}
+  .more-btn:hover{color:var(--text)}
+  .more-menu{display:none;position:absolute;right:0;top:26px;z-index:25;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:4px;min-width:112px;box-shadow:0 10px 28px rgba(0,0,0,.4)}
+  .more-menu.open{display:block}
+  .mi{padding:8px 12px;font-size:13px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap}
+  .mi:hover{background:var(--panel)}
+  .mi.del:hover{color:var(--danger)}
   .bl-panel{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px}
   .bl-item{display:flex;align-items:center;gap:14px;padding:4px 0}
   .bl-item .code{font-family:Consolas,monospace;font-size:14px;color:var(--text);letter-spacing:1px}
@@ -302,7 +309,7 @@
 /* ================= i18n ================= */
 const I18N={
  "zh-TW":{app_sub:"登記你的助戰陣容，或搜尋其他玩家的好友編號 · 全網共享、免費使用",db_label:"DB：",db_unit:"筆",
-  tab1:"好友編號查詢",tab2:"從者搜尋",tab3:"多條件搜尋",q1_sub:"查詢某位玩家的整套助戰板",q1_ph:"輸入好友編號（12 位數字）",btn_query:"查詢",
+  tab1:"好友編號查詢",tab2:"從者搜尋",tab3:"進階搜尋",loading:"載入中…",q1_sub:"查詢某位玩家的整套助戰板",q1_ph:"輸入好友編號（12 位數字）",btn_query:"查詢",
   q2_sub:"找出助戰板中含有指定從者的玩家",lbl_servant:"助戰從者",servant_ph:"輸入從者中／英文名，如 梅林 / Merlin",lbl_minnp:"最低寶具等級(NP) ≥",lbl_server:"伺服器",srv_all:"全部",btn_search:"搜尋",
   q3_sub:"在助戰板中，找到「同一格」同時符合多個條件的玩家",grp_slot_servant:"職階 / 從者",lbl_class:"職階",lbl_np_ge:"寶具 NP ≥",lbl_servant_opt:"指定從者（選填）",servant_opt_ph:"不限從者，或輸入中／英文名指定",
   grp_skill_ce_srv:"寶具 / 技能 / 禮裝 / 伺服器",lbl_skill_ge:"每個技能 ≥",opt_unlimited:"不限",skill_max10:"10（滿技）",lbl_as_which:"指定附加技能 AS",lbl_as_ge:"該 AS 等級 ≥",chk_mlb:"該格附滿破禮裝",btn_search_support:"搜尋助戰",btn_reset:"重設",
@@ -316,7 +323,7 @@ const I18N={
   confirm_del:"確定刪除這筆登記？",btn_del:"刪除",bl_title:"黑名單",bl_block:"屏蔽",bl_unblock:"解除",bl_empty:"尚無屏蔽用戶",bl_blocked_toast:"已加入黑名單",bl_unblocked_toast:"已解除屏蔽",list_empty:"沒有符合的登記。到下方登記你的助戰板吧！",
   dis1:"本站僅供玩家自行登記分享好友編號，所有資料由使用者手動輸入。從者與禮裝資料來源：Atlas Academy（api.atlasacademy.io）。",dis2:"本站與 TYPE-MOON / Aniplex / DELiGHTWORKS 無關，不會、也無法讀取任何玩家遊戲帳號資料。",dis3:"資料儲存在雲端（Supabase），全網玩家共享。需以 Discord 登入才能登記；每個帳號每個伺服器一組助戰板，且只有本人能修改／刪除自己的登記。"},
  "zh-CN":{app_sub:"登记你的助战阵容，或搜索其他玩家的好友编号 · 全网共享、免费使用",db_label:"DB：",db_unit:"条",
-  tab1:"好友编号查询",tab2:"从者搜索",tab3:"多条件搜索",q1_sub:"查询某位玩家的整套助战板",q1_ph:"输入好友编号（12 位数字）",btn_query:"查询",
+  tab1:"好友编号查询",tab2:"从者搜索",tab3:"进阶搜索",loading:"加载中…",q1_sub:"查询某位玩家的整套助战板",q1_ph:"输入好友编号（12 位数字）",btn_query:"查询",
   q2_sub:"找出助战板中含有指定从者的玩家",lbl_servant:"助战从者",servant_ph:"输入从者中／英文名，如 梅林 / Merlin",lbl_minnp:"最低宝具等级(NP) ≥",lbl_server:"服务器",srv_all:"全部",btn_search:"搜索",
   q3_sub:"在助战板中，找到「同一格」同时符合多个条件的玩家",grp_slot_servant:"职阶 / 从者",lbl_class:"职阶",lbl_np_ge:"宝具 NP ≥",lbl_servant_opt:"指定从者（选填）",servant_opt_ph:"不限从者，或输入中／英文名指定",
   grp_skill_ce_srv:"宝具 / 技能 / 礼装 / 服务器",lbl_skill_ge:"每个技能 ≥",opt_unlimited:"不限",skill_max10:"10（满技）",lbl_as_which:"指定附加技能 AS",lbl_as_ge:"该 AS 等级 ≥",chk_mlb:"该格附满破礼装",btn_search_support:"搜索助战",btn_reset:"重置",
@@ -330,7 +337,7 @@ const I18N={
   confirm_del:"确定删除这笔登记？",btn_del:"删除",bl_title:"黑名单",bl_block:"屏蔽",bl_unblock:"解除",bl_empty:"尚无屏蔽用户",bl_blocked_toast:"已加入黑名单",bl_unblocked_toast:"已解除屏蔽",list_empty:"没有符合的登记。到下方登记你的助战板吧！",
   dis1:"本站仅供玩家自行登记分享好友编号，所有资料由使用者手动输入。从者与礼装资料来源：Atlas Academy（api.atlasacademy.io）。",dis2:"本站与 TYPE-MOON / Aniplex / DELiGHTWORKS 无关，不会、也无法读取任何玩家游戏账号资料。",dis3:"数据储存在云端（Supabase），全网玩家共享。需以 Discord 登录才能登记；每个账号每个服务器一组助战板，且只有本人能修改／删除自己的登记。"},
  "en":{app_sub:"Register your support servants, or find other players' friend codes · Free & shared by everyone",db_label:"DB: ",db_unit:"entries",
-  tab1:"Friend Code",tab2:"Servant",tab3:"Advanced",q1_sub:"Look up a player's full support boards",q1_ph:"Enter friend code (12 digits)",btn_query:"Search",
+  tab1:"Friend Code",tab2:"Servant",tab3:"Advanced",loading:"Loading…",q1_sub:"Look up a player's full support boards",q1_ph:"Enter friend code (12 digits)",btn_query:"Search",
   q2_sub:"Find players whose board contains a servant",lbl_servant:"Support servant",servant_ph:"Type a servant name, e.g. Merlin",lbl_minnp:"Min NP level ≥",lbl_server:"Server",srv_all:"All",btn_search:"Search",
   q3_sub:"Find players whose single slot matches all conditions",grp_slot_servant:"Class / Servant",lbl_class:"Class",lbl_np_ge:"NP ≥",lbl_servant_opt:"Servant (optional)",servant_opt_ph:"Any servant, or type a name",
   grp_skill_ce_srv:"NP / Skills / CE / Server",lbl_skill_ge:"Each skill ≥",opt_unlimited:"Any",skill_max10:"10 (max)",lbl_as_which:"Append skill (AS)",lbl_as_ge:"AS level ≥",chk_mlb:"MLB craft essence in slot",btn_search_support:"Search",btn_reset:"Reset",
@@ -344,7 +351,7 @@ const I18N={
   confirm_del:"Delete this entry?",btn_del:"Delete",bl_title:"Blocklist",bl_block:"Block",bl_unblock:"Unblock",bl_empty:"No blocked users",bl_blocked_toast:"User blocked",bl_unblocked_toast:"Unblocked",list_empty:"No matching entries. Register your board below!",
   dis1:"This site is for players to voluntarily register and share friend codes; all data is entered manually. Servant/CE data: Atlas Academy (api.atlasacademy.io).",dis2:"Not affiliated with TYPE-MOON / Aniplex / DELiGHTWORKS. It does not and cannot read any player game account data.",dis3:"Data is stored in the cloud (Supabase) and shared by all players. Discord login is required to register; one board per account per server, and you can only edit/delete your own entries."},
  "ja":{app_sub:"あなたのサポート編成を登録、または他プレイヤーのフレンドIDを検索 · 全体共有・無料",db_label:"DB：",db_unit:"件",
-  tab1:"フレンドID検索",tab2:"サーヴァント検索",tab3:"詳細検索",q1_sub:"プレイヤーのサポート編成を検索",q1_ph:"フレンドID（12桁）を入力",btn_query:"検索",
+  tab1:"フレンドID検索",tab2:"サーヴァント検索",tab3:"詳細検索",loading:"読み込み中…",q1_sub:"プレイヤーのサポート編成を検索",q1_ph:"フレンドID（12桁）を入力",btn_query:"検索",
   q2_sub:"指定サーヴァントを編成しているプレイヤーを検索",lbl_servant:"サポートサーヴァント",servant_ph:"サーヴァント名を入力（例：マーリン / Merlin）",lbl_minnp:"最低宝具レベル(NP) ≥",lbl_server:"サーバー",srv_all:"すべて",btn_search:"検索",
   q3_sub:"同一スロットで全条件を満たすプレイヤーを検索",grp_slot_servant:"クラス / サーヴァント",lbl_class:"クラス",lbl_np_ge:"宝具 NP ≥",lbl_servant_opt:"サーヴァント（任意）",servant_opt_ph:"指定なし、または名前を入力",
   grp_skill_ce_srv:"宝具 / スキル / 礼装 / サーバー",lbl_skill_ge:"各スキル ≥",opt_unlimited:"指定なし",skill_max10:"10（カンスト）",lbl_as_which:"アペンドスキル(AS)",lbl_as_ge:"AS レベル ≥",chk_mlb:"該枠に最大限界突破礼装",btn_search_support:"検索",btn_reset:"リセット",
@@ -567,7 +574,7 @@ $("q3btn").onclick=()=>{const cls=$("q3class").value,rar=+$("q3rar").value,minNp
 $("q3reset").onclick=()=>{q3Servant=null;$("q3picked").innerHTML="";$("q3search").value="";$("q3class").value="";$("q3rar").value="0";$("q3np").value="0";$("q3skill").value="0";$("q3srv").value="";$("q3aswhich").value="0";$("q3aslv").value="0";$("q3mlb").checked=false;$("q3note").value="";showAll();};
 
 /* ================= 顯示 ================= */
-let activeClass=new Set(),activeRar=new Set(),activeSrv=new Set(),activeBoard=new Set(),lastItems=[],lastDesc="";
+let activeClass=new Set(),activeRar=new Set(),activeSrv=new Set(),activeBoard=new Set(),lastItems=[],lastDesc="",loading=true;
 const BL_KEY="fgo_blacklist_v1";
 function loadBL(){try{return JSON.parse(localStorage.getItem(BL_KEY))||[];}catch{return[];}}
 function saveBL(a){localStorage.setItem(BL_KEY,JSON.stringify(a));}
@@ -625,7 +632,7 @@ function renderList(items,desc,keepPage){
   const totalPages=Math.max(1,Math.ceil(shown.length/PAGE_SIZE));if(curPage>totalPages)curPage=totalPages;
   $("count").innerHTML=`${shown.length} ${t("db_unit")}`+(totalPages>1?` · ${curPage}/${totalPages}`:"")+(shown.length?` <span class="copyhint">💡 ${t("copy_hint")}</span>`:"");
   const list=$("list");
-  if(!shown.length){list.innerHTML=`<div class="empty">${t("list_empty")}</div>`;renderPager(1);return;}
+  if(!shown.length){list.innerHTML=`<div class="empty">${loading?t("loading"):t("list_empty")}</div>`;renderPager(1);return;}
   const pageItems=shown.slice((curPage-1)*PAGE_SIZE,curPage*PAGE_SIZE);
   list.innerHTML=pageItems.map(e=>{
     let slots=slotsOf(e);if(activeClass.size||activeRar.size||activeBoard.size)slots=slots.filter(slotPassFilter);
@@ -633,12 +640,13 @@ function renderList(items,desc,keepPage){
       <span class="code" title="copy" onclick="copyCode('${e.friendCode}')">${e.friendCode}</span>
       <span class="badge srv">${srvName(e.server)}</span>
       <span class="badge">${slotsOf(e).length} ${t("unit_slots")}</span>
-      <span class="entry-actions"><span class="act" onclick="block('${e.friendCode}')">🚫 ${t("bl_block")}</span>${(CURRENT_USER&&e.owner===CURRENT_USER.id)?`<span class="act" onclick="del('${e.id}')">🗑 ${t("btn_del")}</span>`:''}</span></div>
+      <span class="entry-actions"><button class="more-btn" onclick="toggleMenu(event,this)" title="更多">⋯</button><div class="more-menu">${(CURRENT_USER&&e.owner===CURRENT_USER.id)?`<div class="mi del" onclick="del('${e.id}')">🗑 ${t("btn_del")}</div>`:''}<div class="mi" onclick="block('${e.friendCode}')">🚫 ${t("bl_block")}</div></div></span></div>
       ${e.note?`<div class="entry-note">📝 ${escapeHtml(e.note)}</div>`:''}
       ${slots.length?`<div class="preview" onclick="toggleBoard('${e.id}',this.nextElementSibling)">${slots.slice(0,12).map(sl=>`<img class="pav" src="${sl.servant.face}" title="${servantLabel(sl.servant)} · ${sl.slotLabel}" loading="lazy" onerror="this.style.display='none'">`).join("")}${slots.length>12?`<span class="pmore">+${slots.length-12}</span>`:''}</div>`:''}
       <button class="expand-btn" data-cnt="${slots.length}" onclick="toggleBoard('${e.id}',this)">▸ ${t("expand_board")} (${slots.length})</button>
       <div class="board-view" style="display:none"></div></div>`;}).join("");
   renderPager(totalPages);
+  if(pageItems.length<=3)document.querySelectorAll("#list .expand-btn").forEach(b=>b.click()); // 少量結果自動展開
 }
 function toggleBoard(id,btn){const bv=btn.parentElement.querySelector(".board-view");const cnt=btn.dataset.cnt;
   if(bv.style.display==="none"){if(!bv.dataset.filled){const e=load().find(x=>x.id===id);if(e){bv.innerHTML=boardHtml(e);bv.dataset.filled="1";}}bv.style.display="block";btn.innerHTML="▾ "+t("collapse_board")+" ("+cnt+")";}
@@ -653,6 +661,8 @@ function gotoPage(n){curPage=n;renderList(lastItems,lastDesc,true);const s=$("cl
 $("clearFilter").onclick=()=>{activeClass.clear();activeRar.clear();activeSrv.clear();activeBoard.clear();q2Servant=null;$("q2picked").innerHTML="";renderStrips();showAll();};
 async function del(id){if(!confirm(t("confirm_del")))return;const {error}=await sb.from("entries").delete().eq("id",id);if(error){console.error(error);toast("刪除失敗");return;}await fetchEntries();refreshDB();showAll();}
 function copyCode(c){navigator.clipboard.writeText(c.replace(/,/g,""));toast(t("toast_copied"));}
+function toggleMenu(ev,btn){ev.stopPropagation();const m=btn.nextElementSibling;const open=m.classList.contains("open");document.querySelectorAll(".more-menu.open").forEach(x=>x.classList.remove("open"));if(!open)m.classList.add("open");}
+document.addEventListener("click",()=>document.querySelectorAll(".more-menu.open").forEach(x=>x.classList.remove("open")));
 
 /* 主題 */
 let THEME=localStorage.getItem("fgo_theme")||"blue";
@@ -667,7 +677,7 @@ $("botLink").onclick=(e)=>{e.preventDefault();toast(t("bot_soon"));};
 /* 初始 */
 $("lang").value=LANG;$("lang").onchange=e=>applyLang(e.target.value);
 loadServants();applyLang(LANG);renderBL();initAuth();
-fetchEntries().then(()=>{refreshDB();renderStrips();showAll();loadMyBoard();});
+fetchEntries().then(()=>{loading=false;refreshDB();renderStrips();showAll();loadMyBoard();});
 </script>
 </body>
 </html>
