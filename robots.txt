@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://simon90041-cmyk.github.io/fgo-support/sitemap.xml
