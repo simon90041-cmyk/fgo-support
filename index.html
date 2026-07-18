@@ -21,18 +21,27 @@
 <meta name="twitter:title" content="FGO 助戰資料庫 | Fate/Grand Order 好友助戰分享站">
 <meta name="twitter:description" content="Fate/Grand Order 好友助戰分享站，登記/搜尋助戰、Discord 登入。">
 <style>
-  :root{--bg:#0e1420;--panel:#161d2c;--panel2:#1e2637;--line:#2b3548;--text:#e7ebf2;--muted:#8b95a8;
-    --gold:#d9b04e;--gold2:#f0cf6f;--accent:#5b8def;--accent2:#3d6fd0;--danger:#c9524b;--green:#5cb87a;
-    --hover:#2b3446;--header1:#1a2334;--header2:#0e1420;}
-  :root[data-theme="gold"]{--bg:#100d08;--panel:#1a1610;--panel2:#241f14;--line:#3a3220;--text:#f1e9d6;--muted:#a99a78;
-    --gold:#e6bd55;--gold2:#f7da85;--accent:#d0a341;--accent2:#b0862f;--danger:#cf5b4a;--green:#9cae5a;
-    --hover:#332b1a;--header1:#221c10;--header2:#100d08;}
-  :root[data-theme="light"]{--bg:#eef1f6;--panel:#ffffff;--panel2:#f3f6fb;--line:#d3dae6;--text:#1c2534;--muted:#697488;
-    --gold:#a9791f;--gold2:#7a5713;--accent:#3567cf;--accent2:#264fa6;--danger:#c33d33;--green:#2f9257;
-    --hover:#e3e9f3;--header1:#ffffff;--header2:#eef1f6;}
+  /* 深藍 — 現代深海軍藍，藍寶石點綴、暖金高光 */
+  :root{--bg:#0a0f1c;--panel:#141c30;--panel2:#1d2842;--line:#2c3a58;--text:#e9eef8;--muted:#93a1bd;
+    --gold:#e2ba57;--gold2:#f5d87e;--accent:#5f97f6;--accent2:#3d70e0;--danger:#e26a61;--green:#54c489;
+    --hover:#263352;--header1:#16223c;--header2:#0a0f1c;
+    --shadow:0 4px 18px rgba(0,0,0,.38);--ring:rgba(95,151,246,.35);
+    --bggrad:radial-gradient(1100px 520px at 50% -8%,rgba(60,112,224,.18),transparent 62%);}
+  /* 暗金 — 溫潤黑金，琥珀奢華 */
+  :root[data-theme="gold"]{--bg:#0c0a05;--panel:#18130b;--panel2:#241c10;--line:#41351f;--text:#f4edda;--muted:#b3a181;
+    --gold:#edc65f;--gold2:#ffe08c;--accent:#dcaa41;--accent2:#bb882a;--danger:#dd6851;--green:#b3b95f;
+    --hover:#372c18;--header1:#241b0d;--header2:#0c0a05;
+    --shadow:0 4px 20px rgba(0,0,0,.5);--ring:rgba(237,198,95,.35);
+    --bggrad:radial-gradient(1100px 520px at 50% -8%,rgba(237,198,95,.13),transparent 62%);}
+  /* 淨白 — 清爽冷白，柔藍點綴 */
+  :root[data-theme="light"]{--bg:#eef2f9;--panel:#ffffff;--panel2:#eef3fb;--line:#dbe2ef;--text:#182234;--muted:#5f6c86;
+    --gold:#bf8a24;--gold2:#8a6212;--accent:#3a6ce0;--accent2:#2851b5;--danger:#d34237;--green:#2c9a5a;
+    --hover:#e6ecf8;--header1:#ffffff;--header2:#e9eef7;
+    --shadow:0 2px 10px rgba(35,55,100,.07),0 8px 28px rgba(35,55,100,.06);--ring:rgba(58,108,224,.28);
+    --bggrad:radial-gradient(1100px 520px at 50% -8%,rgba(58,108,224,.09),transparent 62%);}
   *{box-sizing:border-box}
   body{margin:0;font-family:"Segoe UI","Microsoft JhengHei","PingFang SC","Hiragino Sans",system-ui,sans-serif;
-       background:var(--bg);color:var(--text);line-height:1.5;font-size:14px}
+       background:var(--bggrad),var(--bg);background-attachment:fixed;color:var(--text);line-height:1.5;font-size:14px}
   header{position:relative;padding:22px 16px;text-align:center;background:linear-gradient(180deg,var(--header1),var(--header2));border-bottom:1px solid var(--line)}
   header h1{margin:0;font-size:23px;color:var(--gold2);letter-spacing:2px}
   header .en{font-size:11px;color:var(--muted);letter-spacing:4px;text-transform:uppercase}
@@ -43,13 +52,13 @@
   .uname{font-size:13px;color:var(--gold2)}
   .btn.discord{background:#5865F2;color:#fff}.btn.discord:hover{background:#4752c4}
   .wrap{max-width:1080px;margin:0 auto;padding:16px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:var(--shadow)}
   .sec-title{display:flex;align-items:center;gap:10px;margin:0 0 14px;font-size:16px}
   .sec-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--accent2);color:#fff;font-size:14px;font-weight:700;flex-shrink:0}
   .sec-sub{font-size:12px;color:var(--muted);font-weight:400}
   label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px}
   input,select{width:100%;padding:9px 10px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:14px}
-  input:focus,select:focus{outline:none;border-color:var(--accent)}
+  input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
   .row{display:flex;gap:12px;flex-wrap:wrap}.row>div{flex:1;min-width:120px}
   .btn{padding:10px 18px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-weight:700;font-size:14px;cursor:pointer}
   .btn:hover{background:var(--accent2)}
@@ -95,7 +104,8 @@
   .count{font-size:13px;color:var(--muted);margin:4px 0 12px}
   .copyhint{margin-left:8px;font-size:12px;color:var(--gold2);opacity:.85}
   .reg-gate{background:color-mix(in srgb,var(--accent) 14%,transparent);border:1px solid var(--accent);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:14px;color:var(--text)}
-  .entry{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;position:relative;margin-bottom:12px}
+  .entry{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;position:relative;margin-bottom:12px;box-shadow:var(--shadow);transition:transform .12s,border-color .12s}
+  .entry:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
   .entry .top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
   .code{font-family:Consolas,monospace;font-size:18px;color:var(--text);letter-spacing:1px;cursor:copy}.code:hover{color:var(--gold2)}
   .badge{font-size:11px;padding:2px 9px;border-radius:20px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
