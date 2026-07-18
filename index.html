@@ -444,7 +444,7 @@ function searchServants(q,clsFilter){
   const alts=[q];if(q.includes("artoria"))alts.push(q.replace(/artoria/g,"altria"));if(q.includes("阿爾托莉雅"))alts.push(q.replace(/阿爾托莉雅/g,"阿爾托莉亞"));
   let list=SERVANTS;
   if(clsFilter==="extra")list=list.filter(s=>!BASE7.includes(s.className));
-  else if(clsFilter&&BASE7.includes(clsFilter))list=list.filter(s=>s.className===clsFilter);
+  else if(clsFilter)list=list.filter(s=>classMatch(s.className,clsFilter));
   return list.filter(s=>{const fs=[s.ja,s.en,s.cn,s.tw,s.className].map(x=>(x||"").toLowerCase());return alts.some(a=>fs.some(f=>f.includes(a)));}).slice(0,30);
 }
 function makeServantSearcher(inputId,sugId,onPick,getCls){
@@ -552,7 +552,7 @@ fmtCode($("q1code"));
 $("q1btn").onclick=()=>{const code=$("q1code").value.trim();if(!validCode(code)){toast(t("toast_need_code"));return;}activeClass.clear();activeRar.clear();activeSrv.clear();activeBoard.clear();renderStrips();renderList(load().filter(e=>e.friendCode===code),t("desc_code")+" "+code);};
 let q2Servant=null,q3Servant=null;
 makeServantSearcher("q2search","q2sug",s=>{q2Servant=pickServant(s);$("q2picked").innerHTML=`<div class="picked"><img src="${s.face}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700;color:var(--gold2)">${servantLabel(s)}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(s.rarity)} · ${s.className}</div></div><span class="x" onclick="q2Servant=null;document.getElementById('q2picked').innerHTML=''">✕</span></div>`;});
-makeServantSearcher("q3search","q3sug",s=>{q3Servant=pickServant(s);$("q3picked").innerHTML=`<div class="picked"><img src="${s.face}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700;color:var(--gold2)">${servantLabel(s)}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(s.rarity)} · ${s.className}</div></div><span class="x" onclick="q3Servant=null;document.getElementById('q3picked').innerHTML=''">✕</span></div>`;});
+makeServantSearcher("q3search","q3sug",s=>{q3Servant=pickServant(s);$("q3picked").innerHTML=`<div class="picked"><img src="${s.face}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700;color:var(--gold2)">${servantLabel(s)}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(s.rarity)} · ${s.className}</div></div><span class="x" onclick="q3Servant=null;document.getElementById('q3picked').innerHTML=''">✕</span></div>`;},()=>$("q3class").value);
 $("q2btn").onclick=()=>{if(!q2Servant){toast(t("toast_need_servant"));return;}const minNp=+$("q2np").value,srv=$("q2srv").value;
   let res=load().filter(e=>slotsOf(e).some(sl=>sl.servant.id===q2Servant.id&&sl.np>=minNp));if(srv)res=res.filter(e=>e.server===srv);
   activeClass.clear();activeRar.clear();activeSrv.clear();activeBoard.clear();renderStrips();renderList(res,`${t("desc_contains")} ${servantLabel(q2Servant)} · NP≥${minNp}${srv?` · ${srvName(srv)}`:""}`);};
