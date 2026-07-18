@@ -738,7 +738,10 @@ function renderPager(totalPages){const p=$("pager");if(!p)return;if(totalPages<=
   pageRange(curPage,totalPages).forEach(n=>{h+= n==="..."?'<span class="pgdots">…</span>':mk(n,n,false,n===curPage);});
   h+=mk(curPage+1,"›",curPage>=totalPages,false);p.innerHTML=h;}
 function gotoPage(n){curPage=n;renderList(lastItems,lastDesc,true);const s=$("clsstrip");if(s)s.scrollIntoView({behavior:"smooth",block:"start"});}
-$("clearFilter").onclick=()=>{activeClass.clear();activeRar.clear();activeSrv.clear();activeBoard.clear();q2Servant=null;$("q2picked").innerHTML="";renderStrips();showAll();};
+$("clearFilter").onclick=()=>{activeClass.clear();activeRar.clear();activeSrv.clear();activeBoard.clear();q2Servant=null;$("q2picked").innerHTML="";
+  onlyRecruiting=false;$("recruitFilter").classList.remove("active");
+  saveBL([]);renderBL();
+  renderStrips();showAll();};
 async function del(id){if(!confirm(t("confirm_del")))return;const {error}=await sb.from("entries").delete().eq("id",id);if(error){console.error(error);toast("刪除失敗");return;}await fetchEntries();refreshDB();showAll();}
 function copyCode(c){navigator.clipboard.writeText(c.replace(/,/g,""));toast(t("toast_copied"));}
 function toggleMenu(ev,btn){ev.stopPropagation();const m=btn.nextElementSibling;const open=m.classList.contains("open");document.querySelectorAll(".more-menu.open").forEach(x=>x.classList.remove("open"));if(!open)m.classList.add("open");}
