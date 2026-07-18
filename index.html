@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FGO 助戰資料庫（原型）</title>
+<style>
+  :root{--bg:#0e1420;--panel:#161d2c;--panel2:#1e2637;--line:#2b3548;--text:#e7ebf2;--muted:#8b95a8;
+    --gold:#d9b04e;--gold2:#f0cf6f;--accent:#5b8def;--accent2:#3d6fd0;--danger:#c9524b;--green:#5cb87a;
+    --hover:#2b3446;--header1:#1a2334;--header2:#0e1420;}
+  :root[data-theme="gold"]{--bg:#100d08;--panel:#1a1610;--panel2:#241f14;--line:#3a3220;--text:#f1e9d6;--muted:#a99a78;
+    --gold:#e6bd55;--gold2:#f7da85;--accent:#d0a341;--accent2:#b0862f;--danger:#cf5b4a;--green:#9cae5a;
+    --hover:#332b1a;--header1:#221c10;--header2:#100d08;}
+  :root[data-theme="light"]{--bg:#eef1f6;--panel:#ffffff;--panel2:#f3f6fb;--line:#d3dae6;--text:#1c2534;--muted:#697488;
+    --gold:#a9791f;--gold2:#7a5713;--accent:#3567cf;--accent2:#264fa6;--danger:#c33d33;--green:#2f9257;
+    --hover:#e3e9f3;--header1:#ffffff;--header2:#eef1f6;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI","Microsoft JhengHei","PingFang SC","Hiragino Sans",system-ui,sans-serif;
+       background:var(--bg);color:var(--text);line-height:1.5;font-size:14px}
+  header{position:relative;padding:22px 16px;text-align:center;background:linear-gradient(180deg,var(--header1),var(--header2));border-bottom:1px solid var(--line)}
+  header h1{margin:0;font-size:23px;color:var(--gold2);letter-spacing:2px}
+  header .en{font-size:11px;color:var(--muted);letter-spacing:4px;text-transform:uppercase}
+  header p{margin:8px 0 0;color:var(--muted);font-size:12px}
+  .dbcount{display:inline-block;margin-top:8px;font-size:12px;color:var(--muted)}.dbcount b{color:var(--gold2)}
+  .langbar{position:absolute;top:14px;right:14px;display:flex;gap:8px}.langbar select{width:auto;padding:6px 10px;font-size:12px}
+  .wrap{max-width:1080px;margin:0 auto;padding:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+  .sec-title{display:flex;align-items:center;gap:10px;margin:0 0 14px;font-size:16px}
+  .sec-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--accent2);color:#fff;font-size:14px;font-weight:700;flex-shrink:0}
+  .sec-sub{font-size:12px;color:var(--muted);font-weight:400}
+  label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px}
+  input,select{width:100%;padding:9px 10px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:14px}
+  input:focus,select:focus{outline:none;border-color:var(--accent)}
+  .row{display:flex;gap:12px;flex-wrap:wrap}.row>div{flex:1;min-width:120px}
+  .btn{padding:10px 18px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-weight:700;font-size:14px;cursor:pointer}
+  .btn:hover{background:var(--accent2)}
+  .btn.gold{background:var(--gold);color:#1a1400}.btn.gold:hover{background:var(--gold2)}
+  .btn.sec{background:var(--panel2);color:var(--text);border:1px solid var(--line);font-weight:500}
+  .btn.full{width:100%;margin-top:14px;padding:12px}
+  .btn.danger{background:transparent;border:1px solid var(--danger);color:var(--danger)}
+  .tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+  .tab{flex:1;min-width:110px;padding:11px 8px;text-align:center;cursor:pointer;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--muted);font-size:13px}
+  .tab .t-num{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--panel2);color:var(--muted);font-size:12px;font-weight:700;margin-right:6px}
+  .tab.active{background:var(--panel2);border-color:var(--accent);color:var(--text)}.tab.active .t-num{background:var(--accent);color:#fff}
+  .pane{display:none}.pane.active{display:block}
+  .search-box{position:relative}
+  .suggestions{position:absolute;left:0;right:0;top:100%;z-index:40;background:var(--panel2);border:1px solid var(--line);border-radius:8px;max-height:300px;overflow:auto;margin-top:2px;display:none}
+  .sug-item{display:flex;align-items:center;gap:10px;padding:8px 10px;cursor:pointer;border-bottom:1px solid var(--line)}
+  .sug-item:hover{background:var(--hover)}.sug-item img{width:40px;height:40px;border-radius:6px;background:#000;object-fit:cover}
+  .sug-item .meta{font-size:12px;color:var(--muted)}
+  .strip-label{font-size:12px;color:var(--muted);margin:6px 0 5px}
+  .clsstrip{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+  .clschip{padding:5px 11px;border-radius:20px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:12px;cursor:pointer}
+  .clschip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .clschip.rar.active{background:var(--gold);border-color:var(--gold);color:#1a1400}
+  .board-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+  .btab{padding:7px 12px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:12px;cursor:pointer}
+  .btab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btab .bc{color:var(--gold2);font-weight:700}
+  .bs-label{font-size:12px;color:var(--accent);font-weight:600;margin:12px 0 6px}
+  .slot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px}
+  .slot{background:var(--panel2);border:1px dashed var(--line);border-radius:8px;padding:6px;min-height:98px;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px}
+  .slot:hover{border-color:var(--accent)}.slot.filled{border-style:solid;border-color:var(--gold)}
+  .slot.editing{border-color:var(--accent);border-style:solid;box-shadow:0 0 0 1px var(--accent)}
+  .slot .slabel{font-size:10px;color:var(--muted)}.slot img{width:44px;height:44px;border-radius:6px;background:#000;object-fit:cover}
+  .slot .sname{font-size:10px;color:var(--text);line-height:1.1;max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .slot .smini{font-size:10px;color:var(--gold2)}.slot .plus{font-size:22px;color:var(--muted);margin:10px 0}
+  .slot-editor{background:var(--panel);border:1px solid var(--accent);border-radius:10px;padding:14px;margin-top:12px;display:none}
+  .slot-editor.open{display:block}.se-title{font-size:14px;color:var(--gold2);font-weight:700;margin-bottom:4px}
+  .picked{display:flex;align-items:center;gap:12px;margin-top:8px;padding:10px;background:var(--panel2);border:1px solid var(--gold);border-radius:8px}
+  .picked img{width:48px;height:48px;border-radius:8px;background:#000;object-fit:cover}.picked.ce{border-color:var(--accent)}
+  .picked .x{margin-left:auto;color:var(--muted);cursor:pointer;font-size:20px;padding:0 6px}
+  .skills{display:flex;gap:8px}.skills>div{flex:1}.sk-num{font-size:11px;color:var(--muted);text-align:center;margin-bottom:3px}
+  .count{font-size:13px;color:var(--muted);margin:4px 0 12px}
+  .entry{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;position:relative;margin-bottom:12px}
+  .entry .top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .code{font-family:Consolas,monospace;font-size:18px;color:var(--text);letter-spacing:1px;cursor:copy}.code:hover{color:var(--gold2)}
+  .badge{font-size:11px;padding:2px 9px;border-radius:20px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+  .badge.srv{background:color-mix(in srgb,var(--accent) 20%,transparent);border-color:var(--accent);color:var(--text)}
+  .entry .del{margin-left:auto;color:var(--muted);cursor:pointer;font-size:14px}.entry .del:hover{color:var(--danger)}
+  .entry-actions{margin-left:auto;display:flex;gap:14px}
+  .act{color:var(--muted);cursor:pointer;font-size:14px}.act:hover{color:var(--danger)}
+  .bl-panel{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px}
+  .bl-item{display:flex;align-items:center;gap:14px;padding:4px 0}
+  .bl-item .code{font-family:Consolas,monospace;font-size:14px;color:var(--text);letter-spacing:1px}
+  .entry-note{font-size:12px;color:var(--muted);margin-top:8px;word-break:break-word}
+  .expand-btn{margin-top:10px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer}
+  .expand-btn:hover{border-color:var(--accent);color:var(--text)}
+  .pager{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+  .pgbtn{min-width:34px;padding:6px 10px;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;cursor:pointer;font-size:13px}
+  .pgbtn:hover:not(:disabled){border-color:var(--accent)}
+  .pgbtn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .pgbtn:disabled{opacity:.4;cursor:default}
+  .pgdots{color:var(--muted);padding:6px 2px}
+  .board-view{margin-top:12px}.bv-group{margin-top:10px}
+  .bv-gl{font-size:11px;color:var(--accent);font-weight:600;margin-bottom:6px;border-bottom:1px solid var(--line);padding-bottom:3px}
+  .bv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+  .bv-slot{display:flex;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px}
+  .bv-thumb{display:flex;flex-direction:column;align-items:center;gap:4px;width:46px;flex-shrink:0}
+  .bv-face{width:46px;height:46px;border-radius:6px;background:#000;object-fit:cover}
+  .bv-ce{position:relative;width:32px;height:32px}
+  .bv-ce img{width:32px;height:32px;border-radius:5px;background:#000;object-fit:cover;border:1px solid var(--accent2)}
+  .bv-ce .mlb{position:absolute;right:-6px;bottom:-6px;background:var(--gold);color:#1a1400;font-size:9px;font-weight:800;line-height:1;padding:2px 3px;border-radius:6px;border:1px solid #1a1400}
+  .bv-info{min-width:0;font-size:11px}.bv-info .bv-slabel{color:var(--accent);font-weight:600}
+  .bv-info .bv-sname{color:var(--gold2);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bv-info .bv-cls{color:var(--muted);text-transform:capitalize}.bv-info .bv-stat{color:var(--muted)}
+  .empty{text-align:center;color:var(--muted);padding:44px;font-size:14px}
+  .hint{font-size:11px;color:var(--muted);margin-top:4px}
+  .adv-group{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:10px}
+  .adv-group .gt{font-size:12px;color:var(--accent);margin-bottom:2px;font-weight:600}
+  .chk{display:flex;align-items:center;gap:8px;margin-top:12px}.chk input{width:auto}
+  .disclaimer{font-size:11px;color:var(--muted);text-align:center;padding:22px 16px;border-top:1px solid var(--line);margin-top:10px;line-height:1.7}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#2c7a4b;color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;opacity:0;transition:.3s;pointer-events:none;z-index:99}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <div class="langbar">
+    <select id="theme">
+      <option value="blue">🔵 深藍 Blue</option>
+      <option value="gold">🟡 暗金 Gold</option>
+      <option value="light">⚪ 淨白 Light</option>
+    </select>
+    <select id="lang">
+      <option value="zh-TW">繁體中文</option><option value="zh-CN">简体中文</option><option value="en">English</option><option value="ja">日本語</option>
+    </select>
+  </div>
+  <div class="en">FGO Support Database</div>
+  <h1>⚔ FGO 助戰資料庫</h1>
+  <p data-i18n="app_sub">玩家登記整套助戰板</p>
+  <div class="dbcount"><span data-i18n="db_label">DB：</span><b id="dbCount">0</b> <span data-i18n="db_unit">筆</span></div>
+</header>
+
+<div class="wrap">
+  <!-- 搜尋 -->
+  <div class="card">
+    <div class="tabs">
+      <div class="tab active" data-pane="p1"><span class="t-num">1</span><span data-i18n="tab1">好友編號查詢</span></div>
+      <div class="tab" data-pane="p2"><span class="t-num">2</span><span data-i18n="tab2">從者搜尋</span></div>
+      <div class="tab" data-pane="p3"><span class="t-num">3</span><span data-i18n="tab3">多條件搜尋</span></div>
+    </div>
+    <div class="pane active" id="p1">
+      <div class="sec-sub" data-i18n="q1_sub" style="margin-bottom:8px">查詢某位玩家的整套助戰板</div>
+      <div class="row">
+        <div style="flex:2"><input id="q1code" data-i18n-ph="q1_ph" placeholder="輸入好友編號（12 位數字）" maxlength="15"></div>
+        <div style="flex:0 0 auto"><button class="btn full" style="margin-top:0" id="q1btn" data-i18n="btn_query">查詢</button></div>
+      </div>
+    </div>
+    <div class="pane" id="p2">
+      <div class="sec-sub" data-i18n="q2_sub" style="margin-bottom:8px">找出助戰板中含有指定從者的玩家</div>
+      <label data-i18n="lbl_servant">助戰從者</label>
+      <div class="search-box"><input id="q2search" data-i18n-ph="servant_ph" placeholder="輸入從者中／英文名" autocomplete="off"><div class="suggestions" id="q2sug"></div></div>
+      <div id="q2picked"></div>
+      <div class="row">
+        <div><label data-i18n="lbl_minnp">最低寶具等級(NP) ≥</label><select id="q2np"><option value="1">NP1</option><option value="2">NP2</option><option value="3">NP3</option><option value="4">NP4</option><option value="5">NP5</option></select></div>
+        <div><label data-i18n="lbl_server">伺服器</label><select id="q2srv"><option value="" data-i18n="srv_all">全部</option><option value="JP" data-i18n="srv_jp">日服</option><option value="NA" data-i18n="srv_na">美服</option><option value="TW" data-i18n="srv_tw">台服</option><option value="CN" data-i18n="srv_cn">國服</option></select></div>
+      </div>
+      <button class="btn full" id="q2btn" data-i18n="btn_search">搜尋</button>
+    </div>
+    <div class="pane" id="p3">
+      <div class="sec-sub" data-i18n="q3_sub" style="margin-bottom:8px">在助戰板中，找到「同一格」同時符合多個條件的玩家</div>
+      <div class="adv-group">
+        <div class="gt" data-i18n="grp_slot_servant">職階 / 從者</div>
+        <div class="row">
+          <div><label data-i18n="lbl_class">職階</label><select id="q3class"></select></div>
+          <div><label data-i18n="rarity_title">稀有度</label><select id="q3rar"><option value="0" data-i18n="opt_unlimited">不限</option><option value="5">★5</option><option value="4">★4</option><option value="3">★3</option><option value="2">★2</option><option value="1">★1</option></select></div>
+        </div>
+        <label data-i18n="lbl_servant_opt">指定從者（選填）</label>
+        <div class="search-box"><input id="q3search" data-i18n-ph="servant_opt_ph" placeholder="不限從者，或輸入名字指定" autocomplete="off"><div class="suggestions" id="q3sug"></div></div>
+        <div id="q3picked"></div>
+      </div>
+      <div class="adv-group">
+        <div class="gt" data-i18n="grp_skill_ce_srv">寶具 / 技能 / 禮裝 / 伺服器</div>
+        <div class="row">
+          <div><label data-i18n="lbl_np_ge">寶具 NP ≥</label><select id="q3np"><option value="0" data-i18n="opt_unlimited">不限</option><option value="1">NP1</option><option value="2">NP2</option><option value="3">NP3</option><option value="4">NP4</option><option value="5">NP5</option></select></div>
+          <div><label data-i18n="lbl_skill_ge">每個技能 ≥</label><select id="q3skill"><option value="0" data-i18n="opt_unlimited">不限</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10" data-i18n="skill_max10">10（滿技）</option></select></div>
+        </div>
+        <div class="row">
+          <div><label data-i18n="lbl_as_which">指定附加技能 AS</label><select id="q3aswhich"><option value="0" data-i18n="opt_unlimited">不限</option><option value="1">AS1</option><option value="2">AS2</option><option value="3">AS3</option><option value="4">AS4</option><option value="5">AS5</option></select></div>
+          <div><label data-i18n="lbl_as_ge">該 AS 等級 ≥</label><select id="q3aslv"><option value="0" data-i18n="opt_unlimited">不限</option><option value="1">1</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></div>
+        </div>
+        <div class="row">
+          <div><label data-i18n="lbl_server">伺服器</label><select id="q3srv"><option value="" data-i18n="opt_unlimited">不限</option><option value="JP" data-i18n="srv_jp">日服</option><option value="NA" data-i18n="srv_na">美服</option><option value="TW" data-i18n="srv_tw">台服</option><option value="CN" data-i18n="srv_cn">國服</option></select></div>
+          <div style="display:flex;align-items:flex-end"><div class="chk"><input type="checkbox" id="q3mlb"><label style="margin:0" for="q3mlb" data-i18n="chk_mlb">該格附滿破禮裝</label></div></div>
+        </div>
+        <label data-i18n="lbl_note_kw">註記關鍵字</label>
+        <input id="q3note" data-i18n-ph="note_kw_ph" placeholder="以註記文字搜尋，如 長期">
+      </div>
+      <div class="row" style="margin-top:14px">
+        <div style="flex:2"><button class="btn full" style="margin-top:0" id="q3btn" data-i18n="btn_search_support">搜尋助戰</button></div>
+        <div style="flex:1"><button class="btn sec full" style="margin-top:0" id="q3reset" data-i18n="btn_reset">重設</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 結果 -->
+  <div class="card">
+    <div class="sec-title"><span class="sec-num">≡</span><span data-i18n="result_title">搜尋結果</span> <span class="sec-sub" id="resultDesc"></span></div>
+    <div class="strip-label" data-i18n="class_title">職階</div>
+    <div class="clsstrip" id="clsstrip"></div>
+    <div class="strip-label" data-i18n="rarity_title">稀有度</div>
+    <div class="clsstrip" id="rarstrip"></div>
+    <div class="strip-label" data-i18n="lbl_server">伺服器</div>
+    <div class="clsstrip" id="srvstrip"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <button class="btn sec" style="padding:6px 14px;font-size:12px" id="clearFilter" data-i18n="clear_filter">清除篩選</button>
+      <button class="btn sec" style="padding:6px 14px;font-size:12px" id="blToggle">🚫 <span data-i18n="bl_title">黑名單</span> (<span id="blCount">0</span>)</button>
+    </div>
+    <div id="blPanel" class="bl-panel" style="display:none"></div>
+    <div class="count" id="count"></div>
+    <div id="list"></div>
+    <div id="pager" class="pager"></div>
+  </div>
+
+  <!-- 登記 -->
+  <div class="card">
+    <div class="sec-title"><span class="sec-num">＋</span><span data-i18n="reg_title">登記我的助戰板</span></div>
+    <div class="row">
+      <div><label data-i18n="lbl_server">伺服器</label><select id="server"><option value="JP" data-i18n="srv_jp">日服</option><option value="NA" data-i18n="srv_na">美服</option><option value="TW" data-i18n="srv_tw">台服</option><option value="CN" data-i18n="srv_cn">國服</option></select></div>
+      <div style="flex:2"><label data-i18n="lbl_friendcode">好友編號</label><input id="friendCode" placeholder="123,456,789,012" maxlength="15"><div class="hint" data-i18n="hint_friendcode">遊戲內「我的房間 → 好友」可看到 9 位數編號</div></div>
+    </div>
+    <label data-i18n="lbl_note">註記（20 字內）</label>
+    <input id="regNote" maxlength="20" data-i18n-ph="note_ph" placeholder="例：滿破可長期借">
+    <div class="bs-label" data-i18n="reg_board_hint">6 塊板 · 每塊 9 職階，最多 54 格</div>
+    <div class="board-tabs" id="boardTabs"></div>
+    <div class="bs-label"><span id="curBoardLabel"></span></div>
+    <div class="slot-grid" id="boardGrid"></div>
+
+    <div class="slot-editor" id="editor">
+      <div class="se-title" id="edTitle">編輯格位</div>
+      <div class="search-box"><input id="edSearch" data-i18n-ph="ed_search_ph" placeholder="搜尋從者（中／英文）" autocomplete="off"><div class="suggestions" id="edSug"></div></div>
+      <div id="edPicked"></div>
+      <div class="row">
+        <div><label data-i18n="lbl_np">寶具等級(NP)</label><select id="edNp"><option>NP1</option><option>NP2</option><option>NP3</option><option>NP4</option><option selected>NP5</option></select></div>
+        <div><label data-i18n="lbl_lv">角色等級 Lv</label><input id="edLv" type="number" min="1" max="120" value="90"></div>
+      </div>
+      <label data-i18n="lbl_skills">技能等級（1〜10）</label>
+      <div class="skills"><div><div class="sk-num">1</div><select id="edSk1"></select></div><div><div class="sk-num">2</div><select id="edSk2"></select></div><div><div class="sk-num">3</div><select id="edSk3"></select></div></div>
+      <label data-i18n="lbl_as">附加技能 AS（0=未裝，1〜10）</label>
+      <div class="skills"><div><div class="sk-num">AS1</div><select id="edAs1"></select></div><div><div class="sk-num">AS2</div><select id="edAs2"></select></div><div><div class="sk-num">AS3</div><select id="edAs3"></select></div><div><div class="sk-num">AS4</div><select id="edAs4"></select></div><div><div class="sk-num">AS5</div><select id="edAs5"></select></div></div>
+      <label data-i18n="lbl_ce_opt">附贈禮裝（選填，依伺服器語言）</label>
+      <div class="search-box"><input id="edCe" data-i18n-ph="ed_ce_ph" placeholder="如 萬華鏡 / Kaleidoscope" autocomplete="off"><div class="suggestions" id="edCeSug"></div></div>
+      <div id="edCePicked"></div>
+      <label data-i18n="lbl_ce_lb">禮裝突破數（0〜4，4 = 滿破）</label>
+      <select id="edCeLb"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4" selected data-i18n="ce_lb4">4（滿破）</option></select>
+      <div class="row" style="margin-top:14px">
+        <div style="flex:2"><button class="btn gold full" style="margin-top:0" id="edApply" data-i18n="btn_apply">套用此格</button></div>
+        <div style="flex:1"><button class="btn danger full" style="margin-top:0" id="edClear" data-i18n="btn_clear">清除此格</button></div>
+      </div>
+    </div>
+    <button class="btn gold full" id="saveBtn" data-i18n="btn_save">儲存整套助戰板</button>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <span data-i18n="dis1">本站僅供玩家自行登記分享好友編號。</span><br>
+  <span data-i18n="dis2">本站與 TYPE-MOON / Aniplex / DELiGHTWORKS 無關。</span><br>
+  <b data-i18n="dis3">⚠ 原型：資料儲存在你的瀏覽器。</b>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ================= i18n ================= */
+const I18N={
+ "zh-TW":{app_sub:"玩家登記整套助戰板（6 塊板 × 9 職階），從者／禮裝資料由 Atlas Academy 帶入",db_label:"DB：",db_unit:"筆",
+  tab1:"好友編號查詢",tab2:"從者搜尋",tab3:"多條件搜尋",q1_sub:"查詢某位玩家的整套助戰板",q1_ph:"輸入好友編號（12 位數字）",btn_query:"查詢",
+  q2_sub:"找出助戰板中含有指定從者的玩家",lbl_servant:"助戰從者",servant_ph:"輸入從者中／英文名，如 梅林 / Merlin",lbl_minnp:"最低寶具等級(NP) ≥",lbl_server:"伺服器",srv_all:"全部",btn_search:"搜尋",
+  q3_sub:"在助戰板中，找到「同一格」同時符合多個條件的玩家",grp_slot_servant:"職階 / 從者",lbl_class:"職階",lbl_np_ge:"寶具 NP ≥",lbl_servant_opt:"指定從者（選填）",servant_opt_ph:"不限從者，或輸入中／英文名指定",
+  grp_skill_ce_srv:"寶具 / 技能 / 禮裝 / 伺服器",lbl_skill_ge:"每個技能 ≥",opt_unlimited:"不限",skill_max10:"10（滿技）",lbl_as_which:"指定附加技能 AS",lbl_as_ge:"該 AS 等級 ≥",chk_mlb:"該格附滿破禮裝",btn_search_support:"搜尋助戰",btn_reset:"重設",
+  result_title:"搜尋結果",result_all:"顯示全部登記",class_title:"職階",rarity_title:"從者稀有度",clear_filter:"清除篩選",expand_board:"展開助戰板",collapse_board:"收合助戰板",ce_mlb:"滿破",ce_lb_unit:"突",
+  reg_title:"登記我的助戰板",lbl_friendcode:"好友編號",hint_friendcode:"遊戲內「好友 → 好友搜尋」可看到 12 位數編號",reg_board_hint:"6 塊板（主板＋額外×2＋活動×3）· 每塊 9 職階，最多 54 格",lbl_note:"註記（20 字內）",note_ph:"例：滿破可長期借",lbl_note_kw:"註記關鍵字",note_kw_ph:"以註記文字搜尋，如 長期",
+  ed_edit:"編輯格位",ed_search_ph:"搜尋從者（中／英文）",lbl_np:"寶具等級(NP)",lbl_lv:"角色等級 Lv",lbl_skills:"技能等級（1〜10）",lbl_as:"附加技能 AS（0=未裝，1〜10）",lbl_ce_opt:"附贈禮裝（選填，依伺服器語言）",ed_ce_ph:"如 萬華鏡 / Kaleidoscope",
+  lbl_ce_lb:"禮裝突破數（0〜4，4 = 滿破）",ce_lb4:"4（滿破）",btn_apply:"套用此格",btn_clear:"清除此格",btn_save:"儲存整套助戰板",ed_only:"限",ed_only_extra:"限 Extra 職階",
+  strip_all:"全部",slot_all:"全體",grp_ex:"額外",grp_ev:"活動",board_main:"主板",unit_slots:"格",srv_jp:"日服",srv_na:"美服",srv_tw:"台服",srv_cn:"國服",
+  desc_code:"好友編號",desc_contains:"含",desc_class:"職階",desc_rarity:"從者稀有度",
+  toast_saved:"助戰板登記成功！",toast_need_code:"請輸入完整 9 位數好友編號",toast_need_board:"請至少填一個助戰格位",toast_need_servant:"請先選擇從者",toast_applied:"已套用",toast_cleared:"已清除此格",toast_copied:"已複製編號",
+  confirm_del:"確定刪除這筆登記？",btn_del:"刪除",bl_title:"黑名單",bl_block:"屏蔽",bl_unblock:"解除",bl_empty:"尚無屏蔽用戶",bl_blocked_toast:"已加入黑名單",bl_unblocked_toast:"已解除屏蔽",list_empty:"沒有符合的登記。到下方登記你的助戰板吧！",
+  dis1:"本站僅供玩家自行登記分享好友編號，所有資料由使用者手動輸入。從者與禮裝資料來源：Atlas Academy（api.atlasacademy.io）。",dis2:"本站與 TYPE-MOON / Aniplex / DELiGHTWORKS 無關，不會、也無法讀取任何玩家遊戲帳號資料。",dis3:"⚠ 原型說明：資料儲存在你自己的瀏覽器（localStorage），未上傳雲端。正式版需接後端資料庫（Supabase）+ 登入才能所有人共用。"},
+ "zh-CN":{app_sub:"玩家登记整套助战板（6 块板 × 9 职阶），从者／礼装资料由 Atlas Academy 带入",db_label:"DB：",db_unit:"条",
+  tab1:"好友编号查询",tab2:"从者搜索",tab3:"多条件搜索",q1_sub:"查询某位玩家的整套助战板",q1_ph:"输入好友编号（12 位数字）",btn_query:"查询",
+  q2_sub:"找出助战板中含有指定从者的玩家",lbl_servant:"助战从者",servant_ph:"输入从者中／英文名，如 梅林 / Merlin",lbl_minnp:"最低宝具等级(NP) ≥",lbl_server:"服务器",srv_all:"全部",btn_search:"搜索",
+  q3_sub:"在助战板中，找到「同一格」同时符合多个条件的玩家",grp_slot_servant:"职阶 / 从者",lbl_class:"职阶",lbl_np_ge:"宝具 NP ≥",lbl_servant_opt:"指定从者（选填）",servant_opt_ph:"不限从者，或输入中／英文名指定",
+  grp_skill_ce_srv:"宝具 / 技能 / 礼装 / 服务器",lbl_skill_ge:"每个技能 ≥",opt_unlimited:"不限",skill_max10:"10（满技）",lbl_as_which:"指定附加技能 AS",lbl_as_ge:"该 AS 等级 ≥",chk_mlb:"该格附满破礼装",btn_search_support:"搜索助战",btn_reset:"重置",
+  result_title:"搜索结果",result_all:"显示全部登记",class_title:"职阶",rarity_title:"从者稀有度",clear_filter:"清除筛选",expand_board:"展开助战板",collapse_board:"收合助战板",ce_mlb:"满破",ce_lb_unit:"突",
+  reg_title:"登记我的助战板",lbl_friendcode:"好友编号",hint_friendcode:"游戏内「好友 → 好友搜索」可看到 12 位数编号",reg_board_hint:"6 块板（主板＋额外×2＋活动×3）· 每块 9 职阶，最多 54 格",lbl_note:"注记（20 字内）",note_ph:"例：满破可长期借",lbl_note_kw:"注记关键字",note_kw_ph:"以注记文字搜索，如 长期",
+  ed_edit:"编辑格位",ed_search_ph:"搜索从者（中／英文）",lbl_np:"宝具等级(NP)",lbl_lv:"角色等级 Lv",lbl_skills:"技能等级（1〜10）",lbl_as:"附加技能 AS（0=未装，1〜10）",lbl_ce_opt:"附赠礼装（选填，依服务器语言）",ed_ce_ph:"如 万华镜 / Kaleidoscope",
+  lbl_ce_lb:"礼装突破数（0〜4，4 = 满破）",ce_lb4:"4（满破）",btn_apply:"应用此格",btn_clear:"清除此格",btn_save:"保存整套助战板",ed_only:"限",ed_only_extra:"限 Extra 职阶",
+  strip_all:"全部",slot_all:"全体",grp_ex:"额外",grp_ev:"活动",board_main:"主板",unit_slots:"格",srv_jp:"日服",srv_na:"美服",srv_tw:"台服",srv_cn:"国服",
+  desc_code:"好友编号",desc_contains:"含",desc_class:"职阶",desc_rarity:"从者稀有度",
+  toast_saved:"助战板登记成功！",toast_need_code:"请输入完整 9 位数好友编号",toast_need_board:"请至少填一个助战格位",toast_need_servant:"请先选择从者",toast_applied:"已应用",toast_cleared:"已清除此格",toast_copied:"已复制编号",
+  confirm_del:"确定删除这笔登记？",btn_del:"删除",bl_title:"黑名单",bl_block:"屏蔽",bl_unblock:"解除",bl_empty:"尚无屏蔽用户",bl_blocked_toast:"已加入黑名单",bl_unblocked_toast:"已解除屏蔽",list_empty:"没有符合的登记。到下方登记你的助战板吧！",
+  dis1:"本站仅供玩家自行登记分享好友编号，所有资料由使用者手动输入。从者与礼装资料来源：Atlas Academy（api.atlasacademy.io）。",dis2:"本站与 TYPE-MOON / Aniplex / DELiGHTWORKS 无关，不会、也无法读取任何玩家游戏账号资料。",dis3:"⚠ 原型说明：资料储存在你自己的浏览器（localStorage），未上传云端。正式版需接后端数据库（Supabase）+ 登录才能所有人共用。"},
+ "en":{app_sub:"Players register full support boards (6 boards × 9 classes). Servant/CE data from Atlas Academy.",db_label:"DB: ",db_unit:"entries",
+  tab1:"Friend Code",tab2:"Servant",tab3:"Advanced",q1_sub:"Look up a player's full support boards",q1_ph:"Enter friend code (12 digits)",btn_query:"Search",
+  q2_sub:"Find players whose board contains a servant",lbl_servant:"Support servant",servant_ph:"Type a servant name, e.g. Merlin",lbl_minnp:"Min NP level ≥",lbl_server:"Server",srv_all:"All",btn_search:"Search",
+  q3_sub:"Find players whose single slot matches all conditions",grp_slot_servant:"Class / Servant",lbl_class:"Class",lbl_np_ge:"NP ≥",lbl_servant_opt:"Servant (optional)",servant_opt_ph:"Any servant, or type a name",
+  grp_skill_ce_srv:"NP / Skills / CE / Server",lbl_skill_ge:"Each skill ≥",opt_unlimited:"Any",skill_max10:"10 (max)",lbl_as_which:"Append skill (AS)",lbl_as_ge:"AS level ≥",chk_mlb:"MLB craft essence in slot",btn_search_support:"Search",btn_reset:"Reset",
+  result_title:"Results",result_all:"Showing all entries",class_title:"Class",rarity_title:"Servant rarity",clear_filter:"Clear filters",expand_board:"Show board",collapse_board:"Hide board",ce_mlb:"MLB",ce_lb_unit:"LB",
+  reg_title:"Register my support boards",lbl_friendcode:"Friend code",hint_friendcode:"Find your 12-digit ID in-game: Friends → Friend Search",reg_board_hint:"6 boards (Main + Extra×2 + Event×3) · 9 classes each, up to 54",lbl_note:"Note (max 20)",note_ph:"e.g. MLB, long-term OK",lbl_note_kw:"Note keyword",note_kw_ph:"Search note text, e.g. long-term",
+  ed_edit:"Edit slot",ed_search_ph:"Search servant",lbl_np:"NP level",lbl_lv:"Level",lbl_skills:"Skill levels (1–10)",lbl_as:"Append skills AS (0=none, 1–10)",lbl_ce_opt:"Bundled CE (optional, server language)",ed_ce_ph:"e.g. Kaleidoscope",
+  lbl_ce_lb:"CE limit break (0–4, 4 = MLB)",ce_lb4:"4 (MLB)",btn_apply:"Apply",btn_clear:"Clear",btn_save:"Save support boards",ed_only:"only",ed_only_extra:"Extra classes only",
+  strip_all:"All",slot_all:"All",grp_ex:"Extra",grp_ev:"Event",board_main:"Main",unit_slots:"slots",srv_jp:"JP",srv_na:"NA",srv_tw:"TW",srv_cn:"CN",
+  desc_code:"Friend code",desc_contains:"Contains",desc_class:"Class",desc_rarity:"Servant rarity",
+  toast_saved:"Support boards saved!",toast_need_code:"Enter a full 9-digit friend code",toast_need_board:"Fill at least one slot",toast_need_servant:"Select a servant first",toast_applied:"Applied",toast_cleared:"Slot cleared",toast_copied:"Code copied",
+  confirm_del:"Delete this entry?",btn_del:"Delete",bl_title:"Blocklist",bl_block:"Block",bl_unblock:"Unblock",bl_empty:"No blocked users",bl_blocked_toast:"User blocked",bl_unblocked_toast:"Unblocked",list_empty:"No matching entries. Register your board below!",
+  dis1:"This site is for players to voluntarily register and share friend codes; all data is entered manually. Servant/CE data: Atlas Academy (api.atlasacademy.io).",dis2:"Not affiliated with TYPE-MOON / Aniplex / DELiGHTWORKS. It does not and cannot read any player game account data.",dis3:"⚠ Prototype: data is stored in your own browser (localStorage), not uploaded. Production needs a backend database (Supabase) + login to be shared by everyone."},
+ "ja":{app_sub:"プレイヤーがサポート編成一式（6編成 × 9クラス）を登録。サーヴァント／礼装データは Atlas Academy 提供。",db_label:"DB：",db_unit:"件",
+  tab1:"フレンドID検索",tab2:"サーヴァント検索",tab3:"詳細検索",q1_sub:"プレイヤーのサポート編成を検索",q1_ph:"フレンドID（12桁）を入力",btn_query:"検索",
+  q2_sub:"指定サーヴァントを編成しているプレイヤーを検索",lbl_servant:"サポートサーヴァント",servant_ph:"サーヴァント名を入力（例：マーリン / Merlin）",lbl_minnp:"最低宝具レベル(NP) ≥",lbl_server:"サーバー",srv_all:"すべて",btn_search:"検索",
+  q3_sub:"同一スロットで全条件を満たすプレイヤーを検索",grp_slot_servant:"クラス / サーヴァント",lbl_class:"クラス",lbl_np_ge:"宝具 NP ≥",lbl_servant_opt:"サーヴァント（任意）",servant_opt_ph:"指定なし、または名前を入力",
+  grp_skill_ce_srv:"宝具 / スキル / 礼装 / サーバー",lbl_skill_ge:"各スキル ≥",opt_unlimited:"指定なし",skill_max10:"10（カンスト）",lbl_as_which:"アペンドスキル(AS)",lbl_as_ge:"AS レベル ≥",chk_mlb:"該枠に最大限界突破礼装",btn_search_support:"検索",btn_reset:"リセット",
+  result_title:"検索結果",result_all:"すべての登録を表示",class_title:"クラス",rarity_title:"サーヴァントレアリティ",clear_filter:"フィルター解除",expand_board:"編成を表示",collapse_board:"編成を隠す",ce_mlb:"完凸",ce_lb_unit:"凸",
+  reg_title:"サポート編成を登録",lbl_friendcode:"フレンドID",hint_friendcode:"ゲーム内「フレンド → フレンド検索」で12桁のIDを確認",reg_board_hint:"6編成（メイン＋エクストラ×2＋イベント×3）· 各9クラス、最大54",lbl_note:"メモ（20文字以内）",note_ph:"例：カンスト・長期貸出可",lbl_note_kw:"メモキーワード",note_kw_ph:"メモで検索（例：長期）",
+  ed_edit:"枠を編集",ed_search_ph:"サーヴァントを検索",lbl_np:"宝具レベル(NP)",lbl_lv:"レベル Lv",lbl_skills:"スキルレベル（1〜10）",lbl_as:"アペンドスキル AS（0=未装備, 1〜10）",lbl_ce_opt:"付与礼装（任意・サーバー言語）",ed_ce_ph:"例：カレイドスコープ",
+  lbl_ce_lb:"礼装限界突破（0〜4, 4 = 最大突破）",ce_lb4:"4（最大突破）",btn_apply:"適用",btn_clear:"クリア",btn_save:"サポート編成を保存",ed_only:"限定：",ed_only_extra:"エクストラ限定",
+  strip_all:"すべて",slot_all:"全体",grp_ex:"エクストラ",grp_ev:"イベント",board_main:"メイン",unit_slots:"枠",srv_jp:"日本",srv_na:"北米",srv_tw:"台湾",srv_cn:"中国",
+  desc_code:"フレンドID",desc_contains:"編成:",desc_class:"クラス",desc_rarity:"サーヴァントレアリティ",
+  toast_saved:"サポート編成を登録しました！",toast_need_code:"9桁のフレンドIDを入力してください",toast_need_board:"少なくとも1枠を入力してください",toast_need_servant:"先にサーヴァントを選択してください",toast_applied:"適用しました",toast_cleared:"枠をクリアしました",toast_copied:"IDをコピーしました",
+  confirm_del:"この登録を削除しますか？",btn_del:"削除",bl_title:"ブロックリスト",bl_block:"ブロック",bl_unblock:"解除",bl_empty:"ブロック中のユーザーなし",bl_blocked_toast:"ブロックしました",bl_unblocked_toast:"ブロック解除しました",list_empty:"該当する登録がありません。下で編成を登録してください！",
+  dis1:"本サイトはプレイヤーが自主的にフレンドIDを登録・共有するためのものです。全データは手動入力。サーヴァント／礼装データ：Atlas Academy（api.atlasacademy.io）。",dis2:"TYPE-MOON / Aniplex / DELiGHTWORKS とは無関係です。いかなるプレイヤーのゲームアカウント情報も読み取りません／読み取れません。",dis3:"⚠ プロトタイプ：データはブラウザ（localStorage）に保存され、アップロードされません。正式版は全員で共有するためにバックエンドDB（Supabase）＋ログインが必要です。"}
+};
+let LANG=localStorage.getItem("fgo_lang")||"zh-TW";
+function t(k){return (I18N[LANG]&&I18N[LANG][k])||I18N["zh-TW"][k]||k;}
+function applyLang(lang){LANG=lang;localStorage.setItem("fgo_lang",lang);document.documentElement.lang=lang;
+  document.querySelectorAll("[data-i18n]").forEach(el=>el.textContent=t(el.dataset.i18n));
+  document.querySelectorAll("[data-i18n-ph]").forEach(el=>el.placeholder=t(el.dataset.i18nPh));
+  refreshDB();renderStrips();renderBoardTabs();renderBoardGrid();showAll();renderBL();}
+
+/* ================= 共用 ================= */
+const API="https://api.atlasacademy.io";
+/* ---- Supabase（全網共享後端）---- */
+const SB_URL="https://zcrjtfnwetvryuwugvmn.supabase.co";
+const SB_KEY="sb_publishable_3riOk5fynZmI4CC_mbu89Q_06KwNCDq";
+const sb=window.supabase.createClient(SB_URL,SB_KEY);
+const $=id=>document.getElementById(id);
+function toast(m){const el=$("toast");el.textContent=m;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),1800);}
+let ENTRIES=[];
+function load(){return ENTRIES;}
+async function fetchEntries(){try{
+  const {data,error}=await sb.from("entries").select("id,server,friend_code,note,boards,created_at").order("created_at",{ascending:false});
+  if(error)throw error;
+  ENTRIES=(data||[]).map(r=>({id:r.id,server:r.server,friendCode:r.friend_code,note:r.note||"",boards:r.boards||{}}));
+}catch(e){console.error("fetch",e);toast("讀取失敗，請檢查網路");}}
+function escapeHtml(s){return(s||"").replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+function fmtCode(el){el.addEventListener("input",()=>{let v=el.value.replace(/\D/g,"").slice(0,12);el.value=v.replace(/(\d{3})(?=\d)/g,"$1,");});}
+function validCode(c){const d=(c||"").replace(/\D/g,"");return d.length>=9&&d.length<=12;}
+function srvName(code){return t("srv_"+String(code).toLowerCase());}
+
+const BASE7=["saber","archer","lancer","rider","caster","assassin","berserker"];
+/* 助戰板每塊的 9 職階格 */
+const CLASS_SLOTS=[
+ {key:"all",label:"全體",cls:null},{key:"saber",label:"Saber",cls:"saber"},{key:"archer",label:"Archer",cls:"archer"},
+ {key:"lancer",label:"Lancer",cls:"lancer"},{key:"rider",label:"Rider",cls:"rider"},{key:"caster",label:"Caster",cls:"caster"},
+ {key:"assassin",label:"Assassin",cls:"assassin"},{key:"berserker",label:"Berserker",cls:"berserker"},{key:"extra",label:"Extra",cls:"extra"}];
+const SLOT_BY_KEY={};CLASS_SLOTS.forEach(s=>SLOT_BY_KEY[s.key]=s);
+function slotLabelOf(sl){return sl.key==="all"?t("slot_all"):sl.label;}
+/* 6 塊板 */
+const BOARDS=[{key:"main",cat:"main"},{key:"ex1",cat:"ex",n:1},{key:"ex2",cat:"ex",n:2},{key:"ev1",cat:"ev",n:1},{key:"ev2",cat:"ev",n:2},{key:"ev3",cat:"ev",n:3}];
+function boardLabelOf(b){return b.cat==="main"?t("board_main"):b.cat==="ex"?t("grp_ex")+b.n:t("grp_ev")+b.n;}
+/* 15 職階（結果分類，依 className）*/
+const CLASSES_15=[
+ {key:"saber"},{key:"archer"},{key:"lancer"},{key:"rider"},{key:"caster"},{key:"assassin"},{key:"berserker"},
+ {key:"shielder"},{key:"ruler"},{key:"avenger"},{key:"moonCancer",label:"MoonCancer"},{key:"alterEgo",label:"Alterego"},
+ {key:"foreigner"},{key:"pretender"},{key:"beast",label:"Beast"},{key:"unBeast",label:"UnBeast"}];
+function classLabel(c){const f=CLASSES_15.find(x=>x.key===c);if(f&&f.label)return f.label;const l=f?f.key:c;return l.charAt(0).toUpperCase()+l.slice(1);}
+function classMatch(className,key){const c=(className||"").toLowerCase();if(key==="unBeast")return c.startsWith("unbeast");if(key==="beast")return c.startsWith("beast");return className===key;}
+
+["edSk1","edSk2","edSk3"].forEach(id=>{const s=$(id);for(let i=1;i<=10;i++){const o=document.createElement("option");o.value=i;o.textContent=i;s.appendChild(o);}s.value=10;});
+["edAs1","edAs2","edAs3","edAs4","edAs5"].forEach(id=>{const s=$(id);for(let i=0;i<=10;i++){const o=document.createElement("option");o.value=i;o.textContent=i;s.appendChild(o);}s.value=0;});
+
+/* ---------- 從者索引 ---------- */
+let SERVANTS=[];
+function nameByLang(o){const m={"zh-TW":o.tw||o.cn,"zh-CN":o.cn||o.tw,"en":o.en,"ja":o.ja};return m[LANG]||o.ja||o.tw||o.cn||o.en||o.name||"";}
+function servantLabel(s){if(!s)return"";const p=nameByLang(s);const en=s.en;return (LANG!=="en"&&en&&en!==p)?`${p}（${en}）`:(p||en||s.name||"");}
+function pickServant(s){return{id:s.id,collectionNo:s.collectionNo,ja:s.ja,en:s.en,cn:s.cn,tw:s.tw,className:s.className,rarity:s.rarity,face:s.face};}
+async function loadServants(){try{
+  const regions=[["JP","ja"],["NA","en"],["CN","cn"],["TW","tw"]];  // JP 最完整→提供 id/職階/稀有度/立繪
+  const lists=await Promise.all(regions.map(([r])=>fetch(`https://api.atlasacademy.io/export/${r}/basic_servant.json`).then(x=>x.json())));
+  const byCno={};
+  regions.forEach(([r,key],i)=>{lists[i].forEach(s=>{if(s.collectionNo>0){
+    const e=byCno[s.collectionNo]||(byCno[s.collectionNo]={collectionNo:s.collectionNo});
+    e[key]=s.name; if(e.id===undefined){e.id=s.id;e.className=s.className;e.rarity=s.rarity;} if(!e.face)e.face=s.face;
+  }});});
+  SERVANTS=Object.values(byCno).sort((a,b)=>a.collectionNo-b.collectionNo);
+}catch{}}
+function searchServants(q,clsFilter){
+  q=q.trim().toLowerCase();if(!q)return[];
+  const alts=[q];if(q.includes("artoria"))alts.push(q.replace(/artoria/g,"altria"));if(q.includes("阿爾托莉雅"))alts.push(q.replace(/阿爾托莉雅/g,"阿爾托莉亞"));
+  let list=SERVANTS;
+  if(clsFilter==="extra")list=list.filter(s=>!BASE7.includes(s.className));
+  else if(clsFilter&&BASE7.includes(clsFilter))list=list.filter(s=>s.className===clsFilter);
+  return list.filter(s=>{const fs=[s.ja,s.en,s.cn,s.tw,s.className].map(x=>(x||"").toLowerCase());return alts.some(a=>fs.some(f=>f.includes(a)));}).slice(0,30);
+}
+function makeServantSearcher(inputId,sugId,onPick,getCls){
+  const input=$(inputId),sug=$(sugId);let timer=null;
+  input.addEventListener("input",()=>{const q=input.value.trim();clearTimeout(timer);if(!q){sug.style.display="none";return;}
+    timer=setTimeout(()=>{if(!SERVANTS.length){sug.innerHTML='<div class="sug-item">…</div>';sug.style.display="block";return;}
+      const res=searchServants(q,getCls?getCls():null);
+      if(!res.length){sug.innerHTML='<div class="sug-item">—</div>';sug.style.display="block";return;}
+      sug.innerHTML="";sug.style.display="block";
+      res.forEach(s=>{const d=document.createElement("div");d.className="sug-item";
+        d.innerHTML=`<img src="${s.face}" onerror="this.style.visibility='hidden'"><div><div>${servantLabel(s)}</div><div class="meta">${"★".repeat(s.rarity)} · ${s.className} · No.${s.collectionNo}</div></div>`;
+        d.onclick=()=>{sug.style.display="none";input.value="";onPick(s);};sug.appendChild(d);});},150);});
+}
+function ceName(ce){return nameByLang(ce||{});}
+async function fetchCeNames(id){const regions=[["JP","ja"],["NA","en"],["CN","cn"],["TW","tw"]];const out={};
+  await Promise.all(regions.map(async([r,key])=>{try{const d=await(await fetch(`${API}/basic/${r}/equip/${id}`)).json();if(d&&d.name)out[key]=d.name;}catch{}}));return out;}
+function makeEquipSearcher(inputId,sugId,onPick){
+  const input=$(inputId),sug=$(sugId);let timer=null;
+  input.addEventListener("input",()=>{const q=input.value.trim();clearTimeout(timer);if(!q){sug.style.display="none";return;}
+    timer=setTimeout(async()=>{sug.innerHTML='<div class="sug-item">…</div>';sug.style.display="block";
+      try{
+        const regions=[["JP","ja"],["NA","en"],["TW","tw"],["CN","cn"]];  // 同時查四語區，單字/關鍵字/任何語言都找得到
+        const lists=await Promise.all(regions.map(([r])=>fetch(`${API}/basic/${r}/equip/search?name=${encodeURIComponent(q)}`).then(x=>x.json()).catch(()=>[])));
+        const byId={};
+        regions.forEach(([r,key],i)=>{(Array.isArray(lists[i])?lists[i]:[]).forEach(s=>{const e=byId[s.id]||(byId[s.id]={id:s.id,rarity:s.rarity,face:s.face});e[key]=s.name;if(!e.face)e.face=s.face;});});
+        const arr=Object.values(byId).sort((a,b)=>a.id-b.id).slice(0,25);
+        if(!arr.length){sug.innerHTML='<div class="sug-item">—</div>';return;}
+        sug.innerHTML="";arr.forEach(s=>{const d=document.createElement("div");d.className="sug-item";
+          d.innerHTML=`<img src="${s.face}" onerror="this.style.visibility='hidden'"><div><div>${ceName(s)}</div><div class="meta">${"★".repeat(s.rarity||0)}</div></div>`;
+          d.onclick=()=>{sug.style.display="none";input.value="";onPick(s);};sug.appendChild(d);});}
+      catch{sug.innerHTML='<div class="sug-item">×</div>';}},300);});
+}
+document.addEventListener("click",e=>{if(!e.target.closest(".search-box"))document.querySelectorAll(".suggestions").forEach(s=>s.style.display="none");});
+
+/* Tabs */
+document.querySelectorAll(".tab").forEach(tab=>{tab.onclick=()=>{document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));document.querySelectorAll(".pane").forEach(p=>p.classList.remove("active"));tab.classList.add("active");$(tab.dataset.pane).classList.add("active");};});
+
+/* ================= 助戰板編輯（6 塊板）================= */
+function emptyDraft(){const d={};BOARDS.forEach(b=>d[b.key]={});return d;}
+let boardDraft=emptyDraft(),currentBoard="main",editingKey=null,edServant=null,edCE=null;
+function boardCount(key){return Object.keys(boardDraft[key]||{}).length;}
+function renderBoardTabs(){
+  $("boardTabs").innerHTML=BOARDS.map(b=>{const c=boardCount(b.key);return `<div class="btab ${currentBoard===b.key?'active':''}" data-b="${b.key}">${boardLabelOf(b)}${c?` <span class="bc">${c}</span>`:''}</div>`;}).join("");
+  document.querySelectorAll(".btab").forEach(el=>el.onclick=()=>{currentBoard=el.dataset.b;editingKey=null;$("editor").classList.remove("open");renderBoardTabs();renderBoardGrid();});
+  const b=BOARDS.find(x=>x.key===currentBoard);$("curBoardLabel").textContent=boardLabelOf(b)+" — 9 "+t("class_title");
+}
+function renderBoardGrid(){
+  const bd=boardDraft[currentBoard]||{};
+  $("boardGrid").innerHTML=CLASS_SLOTS.map(sl=>{const s=bd[sl.key];const lbl=slotLabelOf(sl);
+    if(s)return `<div class="slot filled ${editingKey===sl.key?'editing':''}" data-key="${sl.key}"><div class="slabel">${lbl}</div><img src="${s.servant.face}" onerror="this.style.visibility='hidden'"><div class="sname">${servantLabel(s.servant)}</div><div class="smini">NP${s.np}·Lv${s.level||"?"}</div></div>`;
+    return `<div class="slot ${editingKey===sl.key?'editing':''}" data-key="${sl.key}"><div class="slabel">${lbl}</div><div class="plus">＋</div></div>`;}).join("");
+  document.querySelectorAll("#boardGrid .slot").forEach(el=>el.onclick=()=>openEditor(el.dataset.key));
+}
+function openEditor(key){editingKey=key;const sl=SLOT_BY_KEY[key];
+  let note="";if(sl.cls==="extra")note=" ("+t("ed_only_extra")+")";else if(sl.cls)note=" ("+t("ed_only")+" "+sl.cls+")";
+  $("edTitle").textContent=t("ed_edit")+"："+boardLabelOf(BOARDS.find(b=>b.key===currentBoard))+" / "+slotLabelOf(sl)+note;
+  const cur=boardDraft[currentBoard][key];
+  edServant=cur?cur.servant:null;edCE=cur?cur.ce:null;
+  $("edNp").value="NP"+(cur?cur.np:5);$("edLv").value=cur?(cur.level||90):90;
+  [1,2,3].forEach(i=>$("edSk"+i).value=cur?cur.skills[i-1]:10);[1,2,3,4,5].forEach(i=>$("edAs"+i).value=cur?cur.as[i-1]:0);
+  $("edCeLb").value=cur&&cur.ce?cur.ce.lb:4;$("edSearch").value="";$("edCe").value="";
+  renderEdPicked();renderEdCePicked();$("editor").classList.add("open");renderBoardGrid();$("editor").scrollIntoView({behavior:"smooth",block:"nearest"});}
+function renderEdPicked(){const w=$("edPicked");if(!edServant){w.innerHTML="";return;}
+  w.innerHTML=`<div class="picked"><img src="${edServant.face}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700;color:var(--gold2)">${servantLabel(edServant)}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(edServant.rarity)} · ${edServant.className}</div></div><span class="x" onclick="edServant=null;renderEdPicked()">✕</span></div>`;}
+function renderEdCePicked(){const w=$("edCePicked");if(!edCE){w.innerHTML="";return;}
+  w.innerHTML=`<div class="picked ce"><img src="${edCE.face}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700">${ceName(edCE)}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(edCE.rarity)}</div></div><span class="x" onclick="edCE=null;renderEdCePicked()">✕</span></div>`;}
+makeServantSearcher("edSearch","edSug",s=>{edServant=pickServant(s);renderEdPicked();},()=>SLOT_BY_KEY[editingKey]?SLOT_BY_KEY[editingKey].cls:null);
+makeEquipSearcher("edCe","edCeSug",async s=>{edCE={id:s.id,ja:s.ja,en:s.en,tw:s.tw,cn:s.cn,rarity:s.rarity,face:s.face,lb:+$("edCeLb").value};renderEdCePicked();
+  const names=await fetchCeNames(s.id);edCE={...edCE,...names};renderEdCePicked();});
+$("edApply").onclick=()=>{if(!edServant){toast(t("toast_need_servant"));return;}
+  boardDraft[currentBoard][editingKey]={servant:edServant,np:+$("edNp").value.replace("NP",""),level:parseInt($("edLv").value)||null,
+    skills:[+$("edSk1").value,+$("edSk2").value,+$("edSk3").value],as:[+$("edAs1").value,+$("edAs2").value,+$("edAs3").value,+$("edAs4").value,+$("edAs5").value],
+    ce:edCE?{...edCE,lb:+$("edCeLb").value}:null};
+  $("editor").classList.remove("open");editingKey=null;renderBoardTabs();renderBoardGrid();toast(t("toast_applied"));};
+$("edClear").onclick=()=>{delete boardDraft[currentBoard][editingKey];$("editor").classList.remove("open");editingKey=null;renderBoardTabs();renderBoardGrid();toast(t("toast_cleared"));};
+
+/* 儲存 */
+fmtCode($("friendCode"));
+$("saveBtn").onclick=async()=>{const code=$("friendCode").value.trim();
+  if(!validCode(code)){toast(t("toast_need_code"));return;}
+  const boards={};let total=0;BOARDS.forEach(b=>{const bd=boardDraft[b.key];if(bd&&Object.keys(bd).length){boards[b.key]=JSON.parse(JSON.stringify(bd));total+=Object.keys(bd).length;}});
+  if(!total){toast(t("toast_need_board"));return;}
+  const {error}=await sb.from("entries").insert({server:$("server").value,friend_code:code,note:$("regNote").value.trim(),boards});
+  if(error){console.error(error);toast("儲存失敗："+error.message);return;}
+  boardDraft=emptyDraft();currentBoard="main";renderBoardTabs();renderBoardGrid();$("friendCode").value="";$("regNote").value="";
+  toast(t("toast_saved"));await fetchEntries();refreshDB();showAll();};
+
+/* ================= 搜尋 ================= */
+function slotsOf(entry){const out=[];const boards=entry.boards||{};
+  BOARDS.forEach(b=>{const bd=boards[b.key];if(!bd)return;CLASS_SLOTS.forEach(sl=>{if(bd[sl.key])out.push({boardKey:b.key,boardCat:b.cat,boardLabel:boardLabelOf(b),slotKey:sl.key,slotLabel:slotLabelOf(sl),...bd[sl.key]});});});
+  return out;}
+fmtCode($("q1code"));
+$("q1btn").onclick=()=>{const code=$("q1code").value.trim();if(!validCode(code)){toast(t("toast_need_code"));return;}activeClass="";activeRar="";activeSrv="";renderStrips();renderList(load().filter(e=>e.friendCode===code),t("desc_code")+" "+code);};
+let q2Servant=null,q3Servant=null;
+makeServantSearcher("q2search","q2sug",s=>{q2Servant=pickServant(s);$("q2picked").innerHTML=`<div class="picked"><img src="${s.face}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700;color:var(--gold2)">${servantLabel(s)}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(s.rarity)} · ${s.className}</div></div><span class="x" onclick="q2Servant=null;document.getElementById('q2picked').innerHTML=''">✕</span></div>`;});
+makeServantSearcher("q3search","q3sug",s=>{q3Servant=pickServant(s);$("q3picked").innerHTML=`<div class="picked"><img src="${s.face}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700;color:var(--gold2)">${servantLabel(s)}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(s.rarity)} · ${s.className}</div></div><span class="x" onclick="q3Servant=null;document.getElementById('q3picked').innerHTML=''">✕</span></div>`;});
+$("q2btn").onclick=()=>{if(!q2Servant){toast(t("toast_need_servant"));return;}const minNp=+$("q2np").value,srv=$("q2srv").value;
+  let res=load().filter(e=>slotsOf(e).some(sl=>sl.servant.id===q2Servant.id&&sl.np>=minNp));if(srv)res=res.filter(e=>e.server===srv);
+  activeClass="";activeRar="";activeSrv="";renderStrips();renderList(res,`${t("desc_contains")} ${servantLabel(q2Servant)} · NP≥${minNp}${srv?` · ${srvName(srv)}`:""}`);};
+$("q3btn").onclick=()=>{const cls=$("q3class").value,rar=+$("q3rar").value,minNp=+$("q3np").value,minSk=+$("q3skill").value,srv=$("q3srv").value,mlb=$("q3mlb").checked,asW=+$("q3aswhich").value,asL=+$("q3aslv").value;
+  const noteKw=$("q3note").value.trim().toLowerCase();
+  let res=load().filter(e=>{if(srv&&e.server!==srv)return false;
+    if(noteKw&&!(e.note||"").toLowerCase().includes(noteKw))return false;
+    return slotsOf(e).some(sl=>{
+      if(cls&&!classMatch(sl.servant.className,cls))return false;
+      if(rar&&sl.servant.rarity!==rar)return false;
+      if(q3Servant&&sl.servant.id!==q3Servant.id)return false;
+      if(minNp&&sl.np<minNp)return false;
+      if(minSk&&Math.min(...sl.skills)<minSk)return false;
+      if(asW&&asL&&!(sl.as[asW-1]>=asL))return false;
+      if(mlb&&!(sl.ce&&sl.ce.lb===4))return false;return true;});});
+  const parts=[];if(cls)parts.push(classLabel(cls));if(rar)parts.push("★"+rar);if(q3Servant)parts.push(servantLabel(q3Servant));
+  if(minNp)parts.push(`NP≥${minNp}`);if(minSk)parts.push(`SK≥${minSk}`);if(asW&&asL)parts.push(`AS${asW}≥${asL}`);if(mlb)parts.push("MLB");if(noteKw)parts.push("📝"+$("q3note").value.trim());if(srv)parts.push(srvName(srv));
+  activeClass="";activeRar="";activeSrv="";renderStrips();renderList(res,parts.length?parts.join(" · "):t("tab3"));};
+$("q3reset").onclick=()=>{q3Servant=null;$("q3picked").innerHTML="";$("q3search").value="";$("q3class").value="";$("q3rar").value="0";$("q3np").value="0";$("q3skill").value="0";$("q3srv").value="";$("q3aswhich").value="0";$("q3aslv").value="0";$("q3mlb").checked=false;$("q3note").value="";showAll();};
+
+/* ================= 顯示 ================= */
+let activeClass="",activeRar="",activeSrv="",lastItems=[],lastDesc="";
+const BL_KEY="fgo_blacklist_v1";
+function loadBL(){try{return JSON.parse(localStorage.getItem(BL_KEY))||[];}catch{return[];}}
+function saveBL(a){localStorage.setItem(BL_KEY,JSON.stringify(a));}
+function block(code){const bl=loadBL();if(!bl.includes(code)){bl.push(code);saveBL(bl);}renderBL();toast(t("bl_blocked_toast"));renderList(lastItems,lastDesc,true);}
+function unblock(code){saveBL(loadBL().filter(c=>c!==code));renderBL();toast(t("bl_unblocked_toast"));renderList(lastItems,lastDesc,true);}
+function renderBL(){const bl=loadBL();const cnt=$("blCount");if(cnt)cnt.textContent=bl.length;const p=$("blPanel");if(!p)return;
+  p.innerHTML=bl.length?bl.map(c=>`<div class="bl-item"><span class="code">${c}</span><span class="act" onclick="unblock('${c}')">${t("bl_unblock")}</span></div>`).join(""):`<div class="hint">${t("bl_empty")}</div>`;}
+function refreshDB(){$("dbCount").textContent=load().length;
+  const sel=$("q3class");const cur=sel.value;
+  sel.innerHTML=`<option value="">${t("opt_unlimited")}</option>`+CLASSES_15.map(c=>`<option value="${c.key}">${classLabel(c.key)}</option>`).join("");sel.value=cur;}
+function slotPassFilter(sl){if(activeClass&&!classMatch(sl.servant.className,activeClass))return false;if(activeRar&&sl.servant.rarity!==+activeRar)return false;return true;}
+function renderStrips(){
+  const cs=[{key:"",label:t("strip_all")},...CLASSES_15.map(c=>({key:c.key,label:classLabel(c.key)}))];
+  $("clsstrip").innerHTML=cs.map(c=>`<div class="clschip ${activeClass===c.key?'active':''}" data-cls="${c.key}">${c.label}</div>`).join("");
+  document.querySelectorAll("#clsstrip .clschip").forEach(el=>el.onclick=()=>{activeClass=el.dataset.cls;renderStrips();showAll();});
+  const rs=[{v:"",label:t("strip_all")},{v:"5",label:"★5"},{v:"4",label:"★4"},{v:"3",label:"★3"},{v:"2",label:"★2"},{v:"1",label:"★1"}];
+  $("rarstrip").innerHTML=rs.map(r=>`<div class="clschip rar ${activeRar===r.v?'active':''}" data-rar="${r.v}">${r.label}</div>`).join("");
+  document.querySelectorAll("#rarstrip .clschip").forEach(el=>el.onclick=()=>{activeRar=el.dataset.rar;renderStrips();showAll();});
+  const ss=[{v:"",label:t("strip_all")},{v:"JP",label:t("srv_jp")},{v:"NA",label:t("srv_na")},{v:"TW",label:t("srv_tw")},{v:"CN",label:t("srv_cn")}];
+  $("srvstrip").innerHTML=ss.map(s=>`<div class="clschip ${activeSrv===s.v?'active':''}" data-srv="${s.v}">${s.label}</div>`).join("");
+  document.querySelectorAll("#srvstrip .clschip").forEach(el=>el.onclick=()=>{activeSrv=el.dataset.srv;renderStrips();showAll();});
+}
+function showAll(){let items=load();
+  if(activeSrv)items=items.filter(e=>e.server===activeSrv);
+  if(activeClass||activeRar)items=items.filter(e=>slotsOf(e).some(slotPassFilter));
+  const d=[];if(activeSrv)d.push(t("lbl_server")+"："+srvName(activeSrv));if(activeClass)d.push(t("desc_class")+"："+classLabel(activeClass));if(activeRar)d.push(t("desc_rarity")+"：★"+activeRar);
+  renderList(items,d.length?d.join(" · "):t("result_all"));}
+function ceLbTxt(lb){if(!lb||lb<=0)return"";const l=lb===4?t("ce_mlb"):(LANG==="en"?("LB"+lb):(lb+t("ce_lb_unit")));return ` (${l})`;}
+function boardHtml(e){
+  let slots=slotsOf(e);if(activeClass||activeRar)slots=slots.filter(slotPassFilter);
+  return BOARDS.map(b=>{const gs=slots.filter(sl=>sl.boardKey===b.key);if(!gs.length)return"";
+    return `<div class="bv-group"><div class="bv-gl">${boardLabelOf(b)}</div><div class="bv-grid">${gs.map(sl=>`
+      <div class="bv-slot">
+        <div class="bv-thumb">
+          <img class="bv-face" src="${sl.servant.face}" onerror="this.style.visibility='hidden'">
+          ${sl.ce?`<div class="bv-ce"><img src="${sl.ce.face}" onerror="this.style.visibility='hidden'">${sl.ce.lb===4?'<span class="mlb">'+(LANG==='ja'?'極':LANG==='en'?'M':'滿')+'</span>':''}</div>`:''}
+        </div>
+        <div class="bv-info">
+          <div class="bv-slabel">${sl.slotLabel}</div>
+          <div class="bv-sname">${servantLabel(sl.servant)}</div>
+          <div class="bv-cls">${"★".repeat(sl.servant.rarity)} · ${sl.servant.className}</div>
+          <div class="bv-stat">NP${sl.np} · Lv${sl.level||'?'} · ${sl.skills.join('/')}</div>
+          ${sl.as&&sl.as.some(x=>x>0)?`<div class="bv-stat">AS ${sl.as.join('/')}</div>`:''}
+          ${sl.ce?`<div class="bv-stat" style="color:var(--gold2)">${escapeHtml(ceName(sl.ce))}${ceLbTxt(sl.ce.lb)}</div>`:''}
+        </div></div>`).join("")}</div></div>`;}).join("");
+}
+const PAGE_SIZE=20;let curPage=1;
+function renderList(items,desc,keepPage){
+  lastItems=items;lastDesc=desc;if(!keepPage)curPage=1;
+  const bl=new Set(loadBL());const shown=items.filter(e=>!bl.has(e.friendCode));
+  $("resultDesc").textContent=desc||"";
+  const totalPages=Math.max(1,Math.ceil(shown.length/PAGE_SIZE));if(curPage>totalPages)curPage=totalPages;
+  $("count").textContent=`${shown.length} ${t("db_unit")}`+(totalPages>1?` · ${curPage}/${totalPages}`:"");
+  const list=$("list");
+  if(!shown.length){list.innerHTML=`<div class="empty">${t("list_empty")}</div>`;renderPager(1);return;}
+  const pageItems=shown.slice((curPage-1)*PAGE_SIZE,curPage*PAGE_SIZE);
+  list.innerHTML=pageItems.map(e=>{
+    let slots=slotsOf(e);if(activeClass||activeRar)slots=slots.filter(slotPassFilter);
+    return `<div class="entry"><div class="top">
+      <span class="code" title="copy" onclick="copyCode('${e.friendCode}')">${e.friendCode}</span>
+      <span class="badge srv">${srvName(e.server)}</span>
+      <span class="badge">${slotsOf(e).length} ${t("unit_slots")}</span>
+      <span class="entry-actions"><span class="act" onclick="block('${e.friendCode}')">🚫 ${t("bl_block")}</span><span class="act" onclick="del('${e.id}')">🗑 ${t("btn_del")}</span></span></div>
+      ${e.note?`<div class="entry-note">📝 ${escapeHtml(e.note)}</div>`:''}
+      <button class="expand-btn" data-cnt="${slots.length}" onclick="toggleBoard('${e.id}',this)">▸ ${t("expand_board")} (${slots.length})</button>
+      <div class="board-view" style="display:none"></div></div>`;}).join("");
+  renderPager(totalPages);
+}
+function toggleBoard(id,btn){const bv=btn.parentElement.querySelector(".board-view");const cnt=btn.dataset.cnt;
+  if(bv.style.display==="none"){if(!bv.dataset.filled){const e=load().find(x=>x.id===id);if(e){bv.innerHTML=boardHtml(e);bv.dataset.filled="1";}}bv.style.display="block";btn.innerHTML="▾ "+t("collapse_board")+" ("+cnt+")";}
+  else{bv.style.display="none";btn.innerHTML="▸ "+t("expand_board")+" ("+cnt+")";}}
+function pageRange(cur,total){const s=new Set([1,2,total,total-1,cur,cur-1,cur+1].filter(n=>n>=1&&n<=total));const arr=[...s].sort((a,b)=>a-b);const out=[];let prev=0;arr.forEach(n=>{if(n-prev>1)out.push("...");out.push(n);prev=n;});return out;}
+function renderPager(totalPages){const p=$("pager");if(!p)return;if(totalPages<=1){p.innerHTML="";return;}
+  const mk=(n,label,dis,act)=>`<button class="pgbtn ${act?'active':''}" ${dis?'disabled':''} onclick="gotoPage(${n})">${label}</button>`;
+  let h=mk(curPage-1,"‹",curPage<=1,false);
+  pageRange(curPage,totalPages).forEach(n=>{h+= n==="..."?'<span class="pgdots">…</span>':mk(n,n,false,n===curPage);});
+  h+=mk(curPage+1,"›",curPage>=totalPages,false);p.innerHTML=h;}
+function gotoPage(n){curPage=n;renderList(lastItems,lastDesc,true);const s=$("clsstrip");if(s)s.scrollIntoView({behavior:"smooth",block:"start"});}
+$("clearFilter").onclick=()=>{activeClass="";activeRar="";activeSrv="";q2Servant=null;$("q2picked").innerHTML="";renderStrips();showAll();};
+async function del(id){if(!confirm(t("confirm_del")))return;const {error}=await sb.from("entries").delete().eq("id",id);if(error){console.error(error);toast("刪除失敗");return;}await fetchEntries();refreshDB();showAll();}
+function copyCode(c){navigator.clipboard.writeText(c.replace(/,/g,""));toast(t("toast_copied"));}
+
+/* 主題 */
+let THEME=localStorage.getItem("fgo_theme")||"blue";
+function applyTheme(th){THEME=th;localStorage.setItem("fgo_theme",th);document.documentElement.setAttribute("data-theme",th);}
+$("theme").value=THEME;$("theme").onchange=e=>applyTheme(e.target.value);
+applyTheme(THEME);
+
+/* 黑名單 */
+$("blToggle").onclick=()=>{const p=$("blPanel");p.style.display=p.style.display==="none"?"block":"none";renderBL();};
+
+/* 初始 */
+$("lang").value=LANG;$("lang").onchange=e=>applyLang(e.target.value);
+loadServants();applyLang(LANG);renderBL();
+fetchEntries().then(()=>{refreshDB();renderStrips();showAll();});
+</script>
+</body>
+</html>
