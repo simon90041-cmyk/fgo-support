@@ -357,7 +357,7 @@ async function fetchEntries(){try{
 /* ---- 登入（Discord via Supabase Auth）---- */
 let CURRENT_USER=null;
 function displayName(u){const m=u.user_metadata||{};return m.full_name||m.name||m.global_name||(m.custom_claims&&m.custom_claims.global_name)||m.preferred_username||"Discord";}
-function setUser(session){CURRENT_USER=(session&&session.user)?{id:session.user.id,name:displayName(session.user)}:null;renderAuth();refreshDB();showAll();}
+function setUser(session){CURRENT_USER=(session&&session.user)?{id:session.user.id,name:displayName(session.user)}:null;renderAuth();refreshDB();showAll();loadMyBoard();}
 function renderAuth(){const el=$("authArea");if(!el)return;
   if(CURRENT_USER){el.innerHTML=`<span class="uname">👤 ${escapeHtml(CURRENT_USER.name)}</span><button class="btn sec sm" id="logoutBtn">${t("logout")}</button>`;
     $("logoutBtn").onclick=async()=>{await sb.auth.signOut();};}
@@ -451,6 +451,15 @@ document.querySelectorAll(".tab").forEach(tab=>{tab.onclick=()=>{document.queryS
 
 /* ================= 助戰板編輯（6 塊板）================= */
 function emptyDraft(){const d={};BOARDS.forEach(b=>d[b.key]={});return d;}
+function fillDraft(boards){const d=emptyDraft();Object.keys(boards||{}).forEach(k=>{if(d[k]!==undefined)d[k]=JSON.parse(JSON.stringify(boards[k]));});return d;}
+/* 一個帳號每個伺服器只有一組板：載入本人在目前伺服器的既有板來編輯（沒有就清空） */
+function loadMyBoard(){
+  const srv=$("server").value;
+  const mine=CURRENT_USER?ENTRIES.find(e=>e.owner===CURRENT_USER.id&&e.server===srv):null;
+  if(mine){boardDraft=fillDraft(mine.boards);$("friendCode").value=mine.friendCode;$("regNote").value=mine.note||"";}
+  else{boardDraft=emptyDraft();$("friendCode").value="";$("regNote").value="";}
+  currentBoard="main";editingKey=null;$("editor").classList.remove("open");renderBoardTabs();renderBoardGrid();
+}
 let boardDraft=emptyDraft(),currentBoard="main",editingKey=null,edServant=null,edCE=null;
 function boardCount(key){return Object.keys(boardDraft[key]||{}).length;}
 function renderBoardTabs(){
@@ -490,16 +499,16 @@ $("edClear").onclick=()=>{delete boardDraft[currentBoard][editingKey];$("editor"
 
 /* 儲存 */
 fmtCode($("friendCode"));
+$("server").addEventListener("change",loadMyBoard);
 $("saveBtn").onclick=async()=>{
   if(!CURRENT_USER){toast(t("need_login"));return;}
   const code=$("friendCode").value.trim();
   if(!validCode(code)){toast(t("toast_need_code"));return;}
   const boards={};let total=0;BOARDS.forEach(b=>{const bd=boardDraft[b.key];if(bd&&Object.keys(bd).length){boards[b.key]=JSON.parse(JSON.stringify(bd));total+=Object.keys(bd).length;}});
   if(!total){toast(t("toast_need_board"));return;}
-  const {error}=await sb.from("entries").insert({owner:CURRENT_USER.id,server:$("server").value,friend_code:code,note:$("regNote").value.trim(),boards});
+  const {error}=await sb.from("entries").upsert({owner:CURRENT_USER.id,server:$("server").value,friend_code:code,note:$("regNote").value.trim(),boards},{onConflict:"owner,server"});
   if(error){console.error(error);toast("儲存失敗："+error.message);return;}
-  boardDraft=emptyDraft();currentBoard="main";renderBoardTabs();renderBoardGrid();$("friendCode").value="";$("regNote").value="";
-  toast(t("toast_saved"));await fetchEntries();refreshDB();showAll();};
+  toast(t("toast_saved"));await fetchEntries();refreshDB();showAll();loadMyBoard();};
 
 /* ================= 搜尋 ================= */
 function slotsOf(entry){const out=[];const boards=entry.boards||{};
@@ -627,7 +636,7 @@ $("botLink").onclick=(e)=>{e.preventDefault();toast(t("bot_soon"));};
 /* 初始 */
 $("lang").value=LANG;$("lang").onchange=e=>applyLang(e.target.value);
 loadServants();applyLang(LANG);renderBL();initAuth();
-fetchEntries().then(()=>{refreshDB();renderStrips();showAll();});
+fetchEntries().then(()=>{refreshDB();renderStrips();showAll();loadMyBoard();});
 </script>
 </body>
 </html>
