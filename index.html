@@ -154,6 +154,8 @@
   .bv-info{min-width:0;font-size:11px}.bv-info .bv-slabel{color:var(--accent);font-weight:600}
   .bv-info .bv-sname{color:var(--gold2);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .bv-info .bv-cls{color:var(--muted);text-transform:capitalize}.bv-info .bv-stat{color:var(--muted)}
+  .lv100{color:#f0b429;font-weight:800}/* Lv100+ 金色 */
+  .lv120{font-weight:800;background:linear-gradient(90deg,#ff9a3d,#ff5e7a);-webkit-background-clip:text;background-clip:text;color:transparent;filter:saturate(1.1)}/* Lv120 滿級橙金→桃 漸層 */
   .empty{text-align:center;color:var(--muted);padding:44px;font-size:14px}
   .hint{font-size:11px;color:var(--muted);margin-top:4px}
   .adv-group{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:10px}
@@ -458,6 +460,8 @@ let SERVANTS=[];
 function nameByLang(o){const m={"zh-TW":o.tw||o.cn,"zh-CN":o.cn||o.tw,"en":o.en,"ja":o.ja};return m[LANG]||o.ja||o.tw||o.cn||o.en||o.name||"";}
 function servantLabel(s){if(!s)return"";const p=nameByLang(s);const en=s.en;return (LANG!=="en"&&en&&en!==p)?`${p}（${en}）`:(p||en||s.name||"");}
 function pickServant(s){return{id:s.id,collectionNo:s.collectionNo,ja:s.ja,en:s.en,cn:s.cn,tw:s.tw,className:s.className,rarity:s.rarity,face:s.face};}
+/* 從者等級高亮：Lv120＝滿級橙金漸層，Lv100+＝金色 */
+function lvHtml(level){const l=level||0;const txt="Lv"+(level||"?");return l>=120?`<span class="lv120">${txt}</span>`:l>=100?`<span class="lv100">${txt}</span>`:txt;}
 async function loadServants(){try{
   const regions=[["JP","ja"],["NA","en"],["CN","cn"],["TW","tw"]];  // JP 最完整→提供 id/職階/稀有度/立繪
   const lists=await Promise.all(regions.map(([r])=>fetch(`https://api.atlasacademy.io/export/${r}/basic_servant.json`).then(x=>x.json())));
@@ -538,7 +542,7 @@ function renderBoardTabs(){
 function renderBoardGrid(){
   const bd=boardDraft[currentBoard]||{};
   $("boardGrid").innerHTML=CLASS_SLOTS.map(sl=>{const s=bd[sl.key];const lbl=slotLabelOf(sl);
-    if(s)return `<div class="slot filled ${editingKey===sl.key?'editing':''}" data-key="${sl.key}"><div class="slabel">${lbl}</div><img src="${s.servant.face}" onerror="this.style.visibility='hidden'"><div class="sname">${servantLabel(s.servant)}</div><div class="smini">NP${s.np}·Lv${s.level||"?"}</div></div>`;
+    if(s)return `<div class="slot filled ${editingKey===sl.key?'editing':''}" data-key="${sl.key}"><div class="slabel">${lbl}</div><img src="${s.servant.face}" onerror="this.style.visibility='hidden'"><div class="sname">${servantLabel(s.servant)}</div><div class="smini">NP${s.np}·${lvHtml(s.level)}</div></div>`;
     return `<div class="slot ${editingKey===sl.key?'editing':''}" data-key="${sl.key}"><div class="slabel">${lbl}</div><div class="plus">＋</div></div>`;}).join("");
   document.querySelectorAll("#boardGrid .slot").forEach(el=>el.onclick=()=>openEditor(el.dataset.key));
 }
@@ -655,7 +659,7 @@ function boardHtml(e){
           <div class="bv-slabel">${sl.slotLabel}</div>
           <div class="bv-sname">${servantLabel(sl.servant)}</div>
           <div class="bv-cls">${"★".repeat(sl.servant.rarity)} · ${sl.servant.className}</div>
-          <div class="bv-stat">NP${sl.np} · Lv${sl.level||'?'} · ${sl.skills.join('/')}</div>
+          <div class="bv-stat">NP${sl.np} · ${lvHtml(sl.level)} · ${sl.skills.join('/')}</div>
           ${sl.as&&sl.as.some(x=>x>0)?`<div class="bv-stat">AS ${sl.as.join('/')}</div>`:''}
           ${sl.ce?`<div class="bv-stat" style="color:var(--gold2)">${escapeHtml(ceName(sl.ce))}${ceLbTxt(sl.ce.lb)}</div>`:''}
         </div></div>`).join("")}</div></div>`;}).join("");
