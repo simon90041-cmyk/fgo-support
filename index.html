@@ -517,13 +517,13 @@ function slotsOf(entry){const out=[];const boards=entry.boards||{};
   BOARDS.forEach(b=>{const bd=boards[b.key];if(!bd)return;CLASS_SLOTS.forEach(sl=>{if(bd[sl.key])out.push({boardKey:b.key,boardCat:b.cat,boardLabel:boardLabelOf(b),slotKey:sl.key,slotLabel:slotLabelOf(sl),...bd[sl.key]});});});
   return out;}
 fmtCode($("q1code"));
-$("q1btn").onclick=()=>{const code=$("q1code").value.trim();if(!validCode(code)){toast(t("toast_need_code"));return;}activeClass="";activeRar="";activeSrv="";activeBoard="";renderStrips();renderList(load().filter(e=>e.friendCode===code),t("desc_code")+" "+code);};
+$("q1btn").onclick=()=>{const code=$("q1code").value.trim();if(!validCode(code)){toast(t("toast_need_code"));return;}activeClass.clear();activeRar.clear();activeSrv.clear();activeBoard.clear();renderStrips();renderList(load().filter(e=>e.friendCode===code),t("desc_code")+" "+code);};
 let q2Servant=null,q3Servant=null;
 makeServantSearcher("q2search","q2sug",s=>{q2Servant=pickServant(s);$("q2picked").innerHTML=`<div class="picked"><img src="${s.face}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700;color:var(--gold2)">${servantLabel(s)}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(s.rarity)} · ${s.className}</div></div><span class="x" onclick="q2Servant=null;document.getElementById('q2picked').innerHTML=''">✕</span></div>`;});
 makeServantSearcher("q3search","q3sug",s=>{q3Servant=pickServant(s);$("q3picked").innerHTML=`<div class="picked"><img src="${s.face}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700;color:var(--gold2)">${servantLabel(s)}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(s.rarity)} · ${s.className}</div></div><span class="x" onclick="q3Servant=null;document.getElementById('q3picked').innerHTML=''">✕</span></div>`;});
 $("q2btn").onclick=()=>{if(!q2Servant){toast(t("toast_need_servant"));return;}const minNp=+$("q2np").value,srv=$("q2srv").value;
   let res=load().filter(e=>slotsOf(e).some(sl=>sl.servant.id===q2Servant.id&&sl.np>=minNp));if(srv)res=res.filter(e=>e.server===srv);
-  activeClass="";activeRar="";activeSrv="";activeBoard="";renderStrips();renderList(res,`${t("desc_contains")} ${servantLabel(q2Servant)} · NP≥${minNp}${srv?` · ${srvName(srv)}`:""}`);};
+  activeClass.clear();activeRar.clear();activeSrv.clear();activeBoard.clear();renderStrips();renderList(res,`${t("desc_contains")} ${servantLabel(q2Servant)} · NP≥${minNp}${srv?` · ${srvName(srv)}`:""}`);};
 $("q3btn").onclick=()=>{const cls=$("q3class").value,rar=+$("q3rar").value,minNp=+$("q3np").value,minSk=+$("q3skill").value,srv=$("q3srv").value,mlb=$("q3mlb").checked,asW=+$("q3aswhich").value,asL=+$("q3aslv").value;
   const noteKw=$("q3note").value.trim().toLowerCase();
   let res=load().filter(e=>{if(srv&&e.server!==srv)return false;
@@ -538,11 +538,11 @@ $("q3btn").onclick=()=>{const cls=$("q3class").value,rar=+$("q3rar").value,minNp
       if(mlb&&!(sl.ce&&sl.ce.lb===4))return false;return true;});});
   const parts=[];if(cls)parts.push(classLabel(cls));if(rar)parts.push("★"+rar);if(q3Servant)parts.push(servantLabel(q3Servant));
   if(minNp)parts.push(`NP≥${minNp}`);if(minSk)parts.push(`SK≥${minSk}`);if(asW&&asL)parts.push(`AS${asW}≥${asL}`);if(mlb)parts.push("MLB");if(noteKw)parts.push("📝"+$("q3note").value.trim());if(srv)parts.push(srvName(srv));
-  activeClass="";activeRar="";activeSrv="";activeBoard="";renderStrips();renderList(res,parts.length?parts.join(" · "):t("tab3"));};
+  activeClass.clear();activeRar.clear();activeSrv.clear();activeBoard.clear();renderStrips();renderList(res,parts.length?parts.join(" · "):t("tab3"));};
 $("q3reset").onclick=()=>{q3Servant=null;$("q3picked").innerHTML="";$("q3search").value="";$("q3class").value="";$("q3rar").value="0";$("q3np").value="0";$("q3skill").value="0";$("q3srv").value="";$("q3aswhich").value="0";$("q3aslv").value="0";$("q3mlb").checked=false;$("q3note").value="";showAll();};
 
 /* ================= 顯示 ================= */
-let activeClass="",activeRar="",activeSrv="",activeBoard="",lastItems=[],lastDesc="";
+let activeClass=new Set(),activeRar=new Set(),activeSrv=new Set(),activeBoard=new Set(),lastItems=[],lastDesc="";
 const BL_KEY="fgo_blacklist_v1";
 function loadBL(){try{return JSON.parse(localStorage.getItem(BL_KEY))||[];}catch{return[];}}
 function saveBL(a){localStorage.setItem(BL_KEY,JSON.stringify(a));}
@@ -553,29 +553,29 @@ function renderBL(){const bl=loadBL();const cnt=$("blCount");if(cnt)cnt.textCont
 function refreshDB(){$("dbCount").textContent=load().length;
   const sel=$("q3class");const cur=sel.value;
   sel.innerHTML=`<option value="">${t("opt_unlimited")}</option>`+CLASSES_15.map(c=>`<option value="${c.key}">${classLabel(c.key)}</option>`).join("");sel.value=cur;}
-function slotPassFilter(sl){if(activeBoard&&sl.boardKey!==activeBoard)return false;if(activeClass&&!classMatch(sl.servant.className,activeClass))return false;if(activeRar&&sl.servant.rarity!==+activeRar)return false;return true;}
+function slotPassFilter(sl){if(activeBoard.size&&!activeBoard.has(sl.boardKey))return false;if(activeClass.size&&![...activeClass].some(c=>classMatch(sl.servant.className,c)))return false;if(activeRar.size&&!activeRar.has(String(sl.servant.rarity)))return false;return true;}
+/* 複選晶片列：「全部」= 清空選取；其餘可多選（toggle） */
+function chipStrip(id,items,set,isRar){const el=$(id);if(!el)return;
+  el.innerHTML=items.map(it=>{const active=it.key===""?set.size===0:set.has(it.key);return `<div class="clschip ${isRar?'rar ':''}${active?'active':''}" data-k="${it.key}">${it.label}</div>`;}).join("");
+  el.querySelectorAll(".clschip").forEach(c=>c.onclick=()=>{const k=c.dataset.k;if(k==="")set.clear();else if(set.has(k))set.delete(k);else set.add(k);renderStrips();showAll();});}
 function renderStrips(){
-  const cs=[{key:"",label:t("strip_all")},...CLASSES_15.map(c=>({key:c.key,label:classLabel(c.key)}))];
-  $("clsstrip").innerHTML=cs.map(c=>`<div class="clschip ${activeClass===c.key?'active':''}" data-cls="${c.key}">${c.label}</div>`).join("");
-  document.querySelectorAll("#clsstrip .clschip").forEach(el=>el.onclick=()=>{activeClass=el.dataset.cls;renderStrips();showAll();});
-  const rs=[{v:"",label:t("strip_all")},{v:"5",label:"★5"},{v:"4",label:"★4"},{v:"3",label:"★3"},{v:"2",label:"★2"},{v:"1",label:"★1"}];
-  $("rarstrip").innerHTML=rs.map(r=>`<div class="clschip rar ${activeRar===r.v?'active':''}" data-rar="${r.v}">${r.label}</div>`).join("");
-  document.querySelectorAll("#rarstrip .clschip").forEach(el=>el.onclick=()=>{activeRar=el.dataset.rar;renderStrips();showAll();});
-  const ss=[{v:"",label:t("strip_all")},{v:"JP",label:t("srv_jp")},{v:"NA",label:t("srv_na")},{v:"TW",label:t("srv_tw")},{v:"CN",label:t("srv_cn")}];
-  $("srvstrip").innerHTML=ss.map(s=>`<div class="clschip ${activeSrv===s.v?'active':''}" data-srv="${s.v}">${s.label}</div>`).join("");
-  document.querySelectorAll("#srvstrip .clschip").forEach(el=>el.onclick=()=>{activeSrv=el.dataset.srv;renderStrips();showAll();});
-  const bs=[{key:"",label:t("strip_all")},...BOARDS.map(b=>({key:b.key,label:boardLabelOf(b)}))];
-  $("boardstrip").innerHTML=bs.map(b=>`<div class="clschip ${activeBoard===b.key?'active':''}" data-board="${b.key}">${b.label}</div>`).join("");
-  document.querySelectorAll("#boardstrip .clschip").forEach(el=>el.onclick=()=>{activeBoard=el.dataset.board;renderStrips();showAll();});
+  chipStrip("clsstrip",[{key:"",label:t("strip_all")},...CLASSES_15.map(c=>({key:c.key,label:classLabel(c.key)}))],activeClass);
+  chipStrip("rarstrip",[{key:"",label:t("strip_all")},{key:"5",label:"★5"},{key:"4",label:"★4"},{key:"3",label:"★3"},{key:"2",label:"★2"},{key:"1",label:"★1"}],activeRar,true);
+  chipStrip("srvstrip",[{key:"",label:t("strip_all")},{key:"JP",label:t("srv_jp")},{key:"NA",label:t("srv_na")},{key:"TW",label:t("srv_tw")},{key:"CN",label:t("srv_cn")}],activeSrv);
+  chipStrip("boardstrip",[{key:"",label:t("strip_all")},...BOARDS.map(b=>({key:b.key,label:boardLabelOf(b)}))],activeBoard);
 }
 function showAll(){let items=load();
-  if(activeSrv)items=items.filter(e=>e.server===activeSrv);
-  if(activeClass||activeRar||activeBoard)items=items.filter(e=>slotsOf(e).some(slotPassFilter));
-  const d=[];if(activeSrv)d.push(t("lbl_server")+"："+srvName(activeSrv));if(activeBoard)d.push(t("board_title")+"："+boardLabelOf(BOARDS.find(b=>b.key===activeBoard)));if(activeClass)d.push(t("desc_class")+"："+classLabel(activeClass));if(activeRar)d.push(t("desc_rarity")+"：★"+activeRar);
+  if(activeSrv.size)items=items.filter(e=>activeSrv.has(e.server));
+  if(activeClass.size||activeRar.size||activeBoard.size)items=items.filter(e=>slotsOf(e).some(slotPassFilter));
+  const d=[];
+  if(activeSrv.size)d.push(t("lbl_server")+"："+[...activeSrv].map(srvName).join("、"));
+  if(activeBoard.size)d.push(t("board_title")+"："+[...activeBoard].map(k=>boardLabelOf(BOARDS.find(b=>b.key===k))).join("、"));
+  if(activeClass.size)d.push(t("desc_class")+"："+[...activeClass].map(classLabel).join("、"));
+  if(activeRar.size)d.push(t("desc_rarity")+"："+[...activeRar].map(r=>"★"+r).join("、"));
   renderList(items,d.length?d.join(" · "):t("result_all"));}
 function ceLbTxt(lb){if(!lb||lb<=0)return"";const l=lb===4?t("ce_mlb"):(LANG==="en"?("LB"+lb):(lb+t("ce_lb_unit")));return ` (${l})`;}
 function boardHtml(e){
-  let slots=slotsOf(e);if(activeClass||activeRar)slots=slots.filter(slotPassFilter);
+  let slots=slotsOf(e);if(activeClass.size||activeRar.size||activeBoard.size)slots=slots.filter(slotPassFilter);
   return BOARDS.map(b=>{const gs=slots.filter(sl=>sl.boardKey===b.key);if(!gs.length)return"";
     return `<div class="bv-group"><div class="bv-gl">${boardLabelOf(b)}</div><div class="bv-grid">${gs.map(sl=>`
       <div class="bv-slot">
@@ -603,7 +603,7 @@ function renderList(items,desc,keepPage){
   if(!shown.length){list.innerHTML=`<div class="empty">${t("list_empty")}</div>`;renderPager(1);return;}
   const pageItems=shown.slice((curPage-1)*PAGE_SIZE,curPage*PAGE_SIZE);
   list.innerHTML=pageItems.map(e=>{
-    let slots=slotsOf(e);if(activeClass||activeRar)slots=slots.filter(slotPassFilter);
+    let slots=slotsOf(e);if(activeClass.size||activeRar.size||activeBoard.size)slots=slots.filter(slotPassFilter);
     return `<div class="entry"><div class="top">
       <span class="code" title="copy" onclick="copyCode('${e.friendCode}')">${e.friendCode}</span>
       <span class="badge srv">${srvName(e.server)}</span>
@@ -624,7 +624,7 @@ function renderPager(totalPages){const p=$("pager");if(!p)return;if(totalPages<=
   pageRange(curPage,totalPages).forEach(n=>{h+= n==="..."?'<span class="pgdots">…</span>':mk(n,n,false,n===curPage);});
   h+=mk(curPage+1,"›",curPage>=totalPages,false);p.innerHTML=h;}
 function gotoPage(n){curPage=n;renderList(lastItems,lastDesc,true);const s=$("clsstrip");if(s)s.scrollIntoView({behavior:"smooth",block:"start"});}
-$("clearFilter").onclick=()=>{activeClass="";activeRar="";activeSrv="";activeBoard="";q2Servant=null;$("q2picked").innerHTML="";renderStrips();showAll();};
+$("clearFilter").onclick=()=>{activeClass.clear();activeRar.clear();activeSrv.clear();activeBoard.clear();q2Servant=null;$("q2picked").innerHTML="";renderStrips();showAll();};
 async function del(id){if(!confirm(t("confirm_del")))return;const {error}=await sb.from("entries").delete().eq("id",id);if(error){console.error(error);toast("刪除失敗");return;}await fetchEntries();refreshDB();showAll();}
 function copyCode(c){navigator.clipboard.writeText(c.replace(/,/g,""));toast(t("toast_copied"));}
 
