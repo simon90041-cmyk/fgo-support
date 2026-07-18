@@ -507,11 +507,11 @@ function searchServants(q,clsFilter){
   else if(clsFilter)list=list.filter(s=>classMatch(s.className,clsFilter));
   return list.filter(s=>{const fs=[s.ja,s.en,s.cn,s.tw,s.className].map(x=>(x||"").toLowerCase());return alts.some(a=>fs.some(f=>f.includes(a)));}).slice(0,30);
 }
-/* 未輸入時的瀏覽清單：依（職階）以 5★ 優先排序，取前 30，讓使用者點一下就能挑 */
+/* 未輸入時的瀏覽清單：依（職階）以 5★→1★ 排序，全部從者都列出（下拉可捲動），讓使用者點一下就能挑 */
 function browseServants(clsFilter){let list=SERVANTS;
   if(clsFilter==="extra")list=list.filter(s=>!BASE7.includes(s.className));
   else if(clsFilter)list=list.filter(s=>classMatch(s.className,clsFilter));
-  return list.slice().sort((a,b)=>b.rarity-a.rarity||a.collectionNo-b.collectionNo).slice(0,30);}
+  return list.slice().sort((a,b)=>b.rarity-a.rarity||a.collectionNo-b.collectionNo);}
 function makeServantSearcher(inputId,sugId,onPick,getCls,getDup){
   const input=$(inputId),sug=$(sugId);let timer=null;
   function render(res){
@@ -520,7 +520,7 @@ function makeServantSearcher(inputId,sugId,onPick,getCls,getDup){
     const dup=getDup?getDup():null;
     sug.innerHTML="";sug.style.display="block";
     res.forEach(s=>{const d=document.createElement("div");const isDup=dup&&dup.has(s.collectionNo);d.className="sug-item"+(isDup?" dup":"");
-      d.innerHTML=`<img src="${s.face}" onerror="this.style.visibility='hidden'"><div><div>${servantLabel(s)}${isDup?` <span class="dup-tag">${t("dup_hint")}</span>`:""}</div><div class="meta">${"★".repeat(s.rarity)} · ${s.className} · No.${s.collectionNo}</div></div>`;
+      d.innerHTML=`<img src="${s.face}" loading="lazy" onerror="this.style.visibility='hidden'"><div><div>${servantLabel(s)}${isDup?` <span class="dup-tag">${t("dup_hint")}</span>`:""}</div><div class="meta">${"★".repeat(s.rarity)} · ${s.className} · No.${s.collectionNo}</div></div>`;
       if(isDup){d.onclick=()=>toast(t("dup_hint"));}else{d.onclick=()=>{sug.style.display="none";input.value="";onPick(s);};}sug.appendChild(d);});}
   function run(){const q=input.value.trim();const cls=getCls?getCls():null;render(q?searchServants(q,cls):browseServants(cls));}
   input.addEventListener("input",()=>{clearTimeout(timer);timer=setTimeout(run,150);});
