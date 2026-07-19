@@ -443,8 +443,10 @@ function t(k){return (I18N[LANG]&&I18N[LANG][k])||I18N["zh-TW"][k]||k;}
 function applyLang(lang){LANG=lang;localStorage.setItem("fgo_lang",lang);document.documentElement.lang=lang;
   document.querySelectorAll("[data-i18n]").forEach(el=>el.textContent=t(el.dataset.i18n));
   document.querySelectorAll("[data-i18n-ph]").forEach(el=>el.placeholder=t(el.dataset.i18nPh));
-  refreshDB();renderStrips();renderBoardTabs();renderBoardGrid();showAll();renderBL();
-  if($("grandHint"))syncGrandEligibility();}   // 冠位提示也跟著換語言
+  refreshDB();renderStrips();renderBoardTabs();renderBoardGrid();renderBL();
+  /* 換語言時保留目前的搜尋結果，不要跳回「顯示全部」 */
+  if(lastItems&&lastItems.length)renderList(lastItems,lastDesc,true);else showAll();
+  if($("grandHint"))syncGrandEligibility();}
 
 /* ================= 共用 ================= */
 const API="https://api.atlasacademy.io";
@@ -475,14 +477,29 @@ async function likeEntry(id){
 /* ---- 登入（Discord via Supabase Auth）---- */
 let CURRENT_USER=null;
 function displayName(u){const m=u.user_metadata||{};return m.full_name||m.name||m.global_name||(m.custom_claims&&m.custom_claims.global_name)||m.preferred_username||"Discord";}
-function setUser(session){CURRENT_USER=(session&&session.user)?{id:session.user.id,name:displayName(session.user)}:null;renderAuth();refreshDB();showAll();loadMyBoard();fetchMyLikes().then(()=>showAll());}
+let LAST_UID=undefined;
+/* 判斷登記表單是否還是空白，避免覆蓋使用者正在填的內容 */
+function draftIsEmpty(){return !$("friendCode").value.trim()&&!$("regNote").value.trim()
+  &&BOARDS.every(b=>!Object.keys(boardDraft[b.key]||{}).length);}
+function setUser(session){
+  const u=(session&&session.user)?{id:session.user.id,name:displayName(session.user)}:null;
+  const idChanged=(u?u.id:null)!==LAST_UID;LAST_UID=u?u.id:null;
+  CURRENT_USER=u;renderAuth();refreshDB();showAll();
+  /* Supabase 每小時 TOKEN_REFRESHED 也會觸發這裡；只有真的換人登入才重載板子，
+     否則正在編輯的 6 塊板會被無聲清空 */
+  if(idChanged||draftIsEmpty())loadMyBoard();
+  fetchMyLikes().then(()=>showAll());}
 function renderAuth(){const g=$("regGate");if(g)g.style.display=CURRENT_USER?"none":"block";const el=$("authArea");if(!el)return;
   if(CURRENT_USER){el.innerHTML=`<span class="uname">👤 ${escapeHtml(CURRENT_USER.name)}</span><button class="btn sec sm" id="logoutBtn">${t("logout")}</button>`;
     $("logoutBtn").onclick=async()=>{await sb.auth.signOut();};}
   else{el.innerHTML=`<button class="btn discord sm" id="loginBtn">🎮 ${t("login_discord")}</button>`;
     $("loginBtn").onclick=async()=>{await sb.auth.signInWithOAuth({provider:"discord",options:{redirectTo:location.href.split("#")[0]}});};}}
 async function initAuth(){const {data:{session}}=await sb.auth.getSession();setUser(session);sb.auth.onAuthStateChange((_e,s)=>setUser(s));}
-function escapeHtml(s){return(s||"").replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+function escapeHtml(s){return String(s==null?"":s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+/* 好友編號只可能是數字與逗號；資料庫欄位不強制格式，渲染前先清乾淨 */
+function safeCode(c){return String(c==null?"":c).replace(/[^\d,]/g,"").slice(0,20);}
+/* 圖片網址只信任 Atlas 靜態資源，避免 boards JSON 被塞入惡意 src */
+function safeUrl(u){u=String(u==null?"":u);return /^https:\/\/static\.atlasacademy\.io\//.test(u)?u:"";}
 function fmtCode(el){el.addEventListener("input",()=>{let v=el.value.replace(/\D/g,"").slice(0,12);el.value=v.replace(/(\d{3})(?=\d)/g,"$1,");});}
 function validCode(c){const d=(c||"").replace(/\D/g,"");return d.length>=9&&d.length<=12;}
 function srvName(code){return t("srv_"+String(code).toLowerCase());}
@@ -538,7 +555,7 @@ async function loadGrandGraphs(){try{
 async function loadServants(){try{
   const regions=[["JP","ja"],["NA","en"],["CN","cn"],["TW","tw"]];  // JP 最完整→提供 id/職階/稀有度/立繪
   const [lists,svtMap]=await Promise.all([
-    Promise.all(regions.map(([r])=>fetch(`https://api.atlasacademy.io/export/${r}/basic_servant.json`).then(x=>x.json()))),
+    Promise.all(regions.map(([r])=>fetch(`https://api.atlasacademy.io/export/${r}/basic_servant.json`).then(x=>x.json()).catch(()=>[]))),  // 單一語區掛掉不該讓整份從者清單變空
     fetch(CHALDEA_MAP+"svt_names.json").then(x=>x.json()).catch(()=>null)]);
   const byCno={};
   regions.forEach(([r,key],i)=>{lists[i].forEach(s=>{if(s.collectionNo>0){
@@ -732,7 +749,7 @@ function syncGrandEligibility(){
 function renderEdPicked(){const w=$("edPicked");if(!edServant){w.innerHTML="";return;}
   w.innerHTML=`<div class="picked" title="${t("click_to_change")}" onclick="event.stopPropagation();reopenPick('edSearch')"><img src="${edServant.face}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700;color:var(--gold2)">${servantLabel(edServant)}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(edServant.rarity)} · ${edServant.className}</div></div><span class="x" onclick="event.stopPropagation();edServant=null;renderEdPicked()">✕</span></div>`;}
 function renderEdCePicked(){const w=$("edCePicked");if(!edCE){w.innerHTML="";return;}
-  w.innerHTML=`<div class="picked ce" title="${t("click_to_change")}" onclick="event.stopPropagation();reopenPick('edCe')"><img src="${edCE.face}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700">${ceName(edCE)}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(edCE.rarity)}</div></div><span class="x" onclick="event.stopPropagation();edCE=null;renderEdCePicked()">✕</span></div>`;}
+  w.innerHTML=`<div class="picked ce" title="${t("click_to_change")}" onclick="event.stopPropagation();reopenPick('edCe')"><img src="${edCE.face}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700">${ceName(edCE)}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(edCE.rarity||0)}</div></div><span class="x" onclick="event.stopPropagation();edCE=null;renderEdCePicked()">✕</span></div>`;}
 function renderEdCeBondPicked(){const w=$("edCeBondPicked");if(!edCeBond){w.innerHTML="";return;}
   w.innerHTML=`<div class="picked ce" title="${t("click_to_change")}" onclick="event.stopPropagation();reopenPick('edCeBond')"><img src="${edCeBond.face}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700">${ceName(edCeBond)}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(edCeBond.rarity||0)}</div></div><span class="x" onclick="event.stopPropagation();edCeBond=null;renderEdCeBondPicked()">✕</span></div>`;}
 function renderEdCeBonusPicked(){const w=$("edCeBonusPicked");if(!edCeBonus){w.innerHTML="";return;}
@@ -741,7 +758,9 @@ function renderEdCeBonusPicked(){const w=$("edCeBonusPicked");if(!edCeBonus){w.i
    自動帶入第一張，並讓 ② 的下拉只列出這位從者自己的羈絆禮裝 */
 let CUR_BOND_CES=[];
 async function autoFillBondCe(){if(!edServant||!$("edGrand").checked)return;
-  try{const sv=await fetch(`${API}/nice/JP/servant/${edServant.collectionNo}?lore=false`).then(x=>x.json());
+  const forNo=edServant.collectionNo;                       // 記住是幫哪位抓的
+  try{const sv=await fetch(`${API}/nice/JP/servant/${forNo}?lore=false`).then(x=>x.json());
+    if(!edServant||edServant.collectionNo!==forNo)return;    // 期間換了從者就作廢，避免把別人的羈絆禮裝塞進來
     const ids=(sv&&(sv.bondEquips&&sv.bondEquips.length?sv.bondEquips:(sv.bondEquip?[sv.bondEquip]:[])))||[];
     if(!ids.length){CUR_BOND_CES=[];return;}
     await loadEquipIndex();
@@ -754,14 +773,17 @@ $("edGrand").onchange=()=>{syncGrandUI();autoFillBondCe();};
 $("edLv").addEventListener("input",syncGrandEligibility);
 [1,2,3].forEach(i=>$("edSk"+i).addEventListener("change",syncGrandEligibility));
 makeEquipSearcher("edCeBond","edCeBondSug",async s=>{edCeBond={id:s.id,ja:s.ja,en:s.en,tw:s.tw,cn:s.cn,rarity:s.rarity,face:s.face};renderEdCeBondPicked();
-  const names=await fetchCeNames(s.id);edCeBond={...edCeBond,...names};renderEdCeBondPicked();},
+  const names=await fetchCeNames(s.id);
+  if(edCeBond&&edCeBond.id===s.id){edCeBond={...edCeBond,...names};renderEdCeBondPicked();}},
   ()=>CUR_BOND_CES);                                          // ② 只列該從者專屬羈絆禮裝
 makeEquipSearcher("edCeBonus","edCeBonusSug",async s=>{edCeBonus={id:s.id,ja:s.ja,en:s.en,tw:s.tw,cn:s.cn,rarity:s.rarity,face:s.face};renderEdCeBonusPicked();
-  const names=await fetchCeNames(s.id);edCeBonus={...edCeBonus,...names};renderEdCeBonusPicked();},
+  const names=await fetchCeNames(s.id);
+  if(edCeBonus&&edCeBonus.id===s.id){edCeBonus={...edCeBonus,...names};renderEdCeBonusPicked();}},
   ()=>COMMON_CE.filter(c=>c.cat==="bonus"));                   // ③ 只列 QP／加絆 類
 makeServantSearcher("edSearch","edSug",s=>{edServant=pickServant(s);CUR_BOND_CES=[];renderEdPicked();syncGrandEligibility();autoFillBondCe();},()=>SLOT_BY_KEY[editingKey]?SLOT_BY_KEY[editingKey].cls:null,()=>draftServantIds(currentBoard,editingKey));
 makeEquipSearcher("edCe","edCeSug",async s=>{edCE={id:s.id,ja:s.ja,en:s.en,tw:s.tw,cn:s.cn,rarity:s.rarity,face:s.face,lb:+$("edCeLb").value};renderEdCePicked();
-  const names=await fetchCeNames(s.id);edCE={...edCE,...names};renderEdCePicked();},
+  const names=await fetchCeNames(s.id);
+  if(edCE&&edCE.id===s.id){edCE={...edCE,...names};renderEdCePicked();}},   // 晚回來的結果若已換/已清除就丟掉
   ()=>COMMON_CE.filter(c=>c.cat!=="bonus"));   // ① 常規：輸出/功能性＋羈絆，加成類留給 ③
 $("edApply").onclick=()=>{if(!edServant){toast(t("toast_need_servant"));return;}
   if(edServant.collectionNo!=null&&draftServantIds(currentBoard,editingKey).has(edServant.collectionNo)){toast(t("dup_hint"));return;}
@@ -793,7 +815,12 @@ $("saveBtn").onclick=async()=>{
 
 /* ================= 搜尋 ================= */
 function slotsOf(entry){const out=[];const boards=entry.boards||{};
-  BOARDS.forEach(b=>{const bd=boards[b.key];if(!bd)return;CLASS_SLOTS.forEach(sl=>{if(bd[sl.key])out.push({boardKey:b.key,boardCat:b.cat,boardLabel:boardLabelOf(b),slotKey:sl.key,slotLabel:slotLabelOf(sl),...bd[sl.key]});});});
+  BOARDS.forEach(b=>{const bd=boards[b.key];if(!bd||typeof bd!=="object")return;
+    CLASS_SLOTS.forEach(sl=>{const d=bd[sl.key];
+      if(!d||typeof d!=="object"||!d.servant)return;          // 略過殘缺資料，避免一筆壞資料讓整站報錯
+      out.push({...d,                                          // 展開放最前面，算出來的欄位不可被覆寫
+        skills:Array.isArray(d.skills)?d.skills:[],as:Array.isArray(d.as)?d.as:[],
+        boardKey:b.key,boardCat:b.cat,boardLabel:boardLabelOf(b),slotKey:sl.key,slotLabel:slotLabelOf(sl)});});});
   return out;}
 fmtCode($("q1code"));
 $("q1btn").onclick=()=>{const code=$("q1code").value.trim();if(!validCode(code)){toast(t("toast_need_code"));return;}activeClass.clear();activeRar.clear();activeSrv.clear();activeBoard.clear();renderStrips();renderList(load().filter(e=>e.friendCode===code),t("desc_code")+" "+code);};
@@ -835,7 +862,7 @@ function saveBL(a){localStorage.setItem(BL_KEY,JSON.stringify(a));}
 function block(code){const bl=loadBL();if(!bl.includes(code)){bl.push(code);saveBL(bl);}renderBL();toast(t("bl_blocked_toast"));renderList(lastItems,lastDesc,true);}
 function unblock(code){saveBL(loadBL().filter(c=>c!==code));renderBL();toast(t("bl_unblocked_toast"));renderList(lastItems,lastDesc,true);}
 function renderBL(){const bl=loadBL();const cnt=$("blCount");if(cnt)cnt.textContent=bl.length;const p=$("blPanel");if(!p)return;
-  p.innerHTML=bl.length?bl.map(c=>`<div class="bl-item"><span class="code">${c}</span><span class="act" onclick="unblock('${c}')">${t("bl_unblock")}</span></div>`).join(""):`<div class="hint">${t("bl_empty")}</div>`;}
+  p.innerHTML=bl.length?bl.map(c=>`<div class="bl-item"><span class="code">${escapeHtml(safeCode(c))}</span><span class="act" onclick="unblock('${safeCode(c)}')">${t("bl_unblock")}</span></div>`).join(""):`<div class="hint">${t("bl_empty")}</div>`;}
 function refreshDB(){$("dbCount").textContent=load().length;
   const sel=$("q3class");const cur=sel.value;
   sel.innerHTML=`<option value="">${t("opt_unlimited")}</option>`+CLASSES_15.map(c=>`<option value="${c.key}">${classLabel(c.key)}</option>`).join("");sel.value=cur;}
@@ -866,19 +893,19 @@ function boardHtml(e){
     return `<div class="bv-group"><div class="bv-gl">${boardLabelOf(b)}</div><div class="bv-grid">${gs.map(sl=>`
       <div class="bv-slot">
         <div class="bv-thumb">
-          <img class="bv-face" src="${sl.servant.face}" title="${escapeHtml(servantLabel(sl.servant))}" onerror="this.style.visibility='hidden'">
-          ${sl.ce?`<div class="bv-ce"><img src="${sl.ce.face}" title="${escapeHtml(ceName(sl.ce)+ceLbTxt(sl.ce.lb))}" onerror="this.style.visibility='hidden'">${sl.ce.lb===4?'<span class="mlb">'+(LANG==='ja'?'極':LANG==='en'?'M':'滿')+'</span>':''}</div>`:''}
+          <img class="bv-face" src="${safeUrl(sl.servant.face)}" title="${escapeHtml(servantLabel(sl.servant))}" onerror="this.style.visibility='hidden'">
+          ${sl.ce?`<div class="bv-ce"><img src="${safeUrl(sl.ce.face)}" title="${escapeHtml(ceName(sl.ce)+ceLbTxt(sl.ce.lb))}" onerror="this.style.visibility='hidden'">${sl.ce.lb===4?'<span class="mlb">'+(LANG==='ja'?'極':LANG==='en'?'M':'滿')+'</span>':''}</div>`:''}
         </div>
         <div class="bv-info">
-          <div class="bv-slabel">${sl.slotLabel}</div>
-          <div class="bv-sname">${servantLabel(sl.servant)}</div>
-          <div class="bv-cls">${"★".repeat(sl.servant.rarity)} · ${sl.servant.className}</div>
-          <div class="bv-stat">${npHtml(sl.np)} · ${lvHtml(sl.level)} · ${sl.skills.join('/')}</div>
-          ${sl.as&&sl.as.some(x=>x>0)?`<div class="bv-stat">AS ${sl.as.join('/')}</div>`:''}
+          <div class="bv-slabel">${escapeHtml(sl.slotLabel)}</div>
+          <div class="bv-sname">${escapeHtml(servantLabel(sl.servant))}</div>
+          <div class="bv-cls">${"★".repeat(Math.max(0,Math.min(5,+sl.servant.rarity||0)))} · ${escapeHtml(sl.servant.className)}</div>
+          <div class="bv-stat">${npHtml(sl.np)} · ${lvHtml(sl.level)} · ${escapeHtml((sl.skills||[]).join('/'))}</div>
+          ${sl.as&&sl.as.some(x=>x>0)?`<div class="bv-stat">AS ${escapeHtml(sl.as.join('/'))}</div>`:''}
           ${sl.ce?`<div class="bv-stat" style="color:var(--gold2)">${escapeHtml(ceName(sl.ce))}${ceLbTxt(sl.ce.lb)}</div>`:''}
           ${sl.grand?`<div class="bv-stat grand-tag">👑 ${t("grand_short")}</div>`:''}
-          ${sl.ceBond?`<div class="bv-stat" style="color:var(--gold2)"><img class="ce-mini" src="${sl.ceBond.face}" onerror="this.style.display='none'">${escapeHtml(ceName(sl.ceBond))}${sl.ceBond.mode==='np50'?'<span class="np50-tag">50NP</span>':''}</div>`:''}
-          ${sl.ceBonus?`<div class="bv-stat" style="color:var(--gold2)"><img class="ce-mini" src="${sl.ceBonus.face}" onerror="this.style.display='none'">${escapeHtml(ceName(sl.ceBonus))}</div>`:''}
+          ${sl.ceBond?`<div class="bv-stat" style="color:var(--gold2)"><img class="ce-mini" src="${safeUrl(sl.ceBond.face)}" onerror="this.style.display='none'">${escapeHtml(ceName(sl.ceBond))}${sl.ceBond.mode==='np50'?'<span class="np50-tag">50NP</span>':''}</div>`:''}
+          ${sl.ceBonus?`<div class="bv-stat" style="color:var(--gold2)"><img class="ce-mini" src="${safeUrl(sl.ceBonus.face)}" onerror="this.style.display='none'">${escapeHtml(ceName(sl.ceBonus))}</div>`:''}
         </div></div>`).join("")}</div></div>`;}).join("");
 }
 const PAGE_SIZE=20;let curPage=1;
@@ -899,15 +926,15 @@ function renderList(items,desc,keepPage){
     const mine=CURRENT_USER&&e.owner===CURRENT_USER.id;
     const liked=MYLIKES.has(e.id);
     return `<div class="entry${mine?' mine':''}${e.full?' full':''}"><div class="top">
-      <span class="code" title="copy" onclick="copyCode('${e.friendCode}')">${e.friendCode}</span>
+      <span class="code" title="copy" onclick="copyCode('${safeCode(e.friendCode)}')">${escapeHtml(safeCode(e.friendCode))}</span>
       <span class="badge srv">${srvName(e.server)}</span>
       <span class="badge ${e.full?'st-full':'st-open'}">${e.full?t("badge_full"):t("badge_open")}</span>
       ${mine?`<span class="badge mine-badge">⭐ ${t("your_entry")}</span>`:''}
       <button class="like-btn${liked?' liked':''}" onclick="likeEntry('${e.id}')" title="${t("like")}">👍 <span>${e.likes||0}</span></button>
-      <span class="entry-actions"><button class="more-btn" onclick="toggleMenu(event,this)" title="更多">⋯</button><div class="more-menu">${mine?`<div class="mi del" onclick="del('${e.id}')">🗑 ${t("btn_del")}</div>`:''}<div class="mi" onclick="block('${e.friendCode}')">🚫 ${t("bl_block")}</div></div></span></div>
+      <span class="entry-actions"><button class="more-btn" onclick="toggleMenu(event,this)" title="更多">⋯</button><div class="more-menu">${mine?`<div class="mi del" onclick="del('${e.id}')">🗑 ${t("btn_del")}</div>`:''}<div class="mi" onclick="block('${safeCode(e.friendCode)}')">🚫 ${t("bl_block")}</div></div></span></div>
       ${e.note?`<div class="entry-note">📝 ${escapeHtml(e.note)}</div>`:''}
       ${e.updatedAt?`<div class="entry-updated">🕒 ${t("updated_lbl")} ${timeAgo(e.updatedAt)}</div>`:''}
-      ${slots.length?`<div class="preview" onclick="toggleBoard('${e.id}',this.nextElementSibling)">${slots.slice(0,12).map(sl=>`<img class="pav" src="${sl.servant.face}" title="${escapeHtml(servantLabel(sl.servant)+" · "+sl.slotLabel)}" loading="lazy" onerror="this.style.display='none'">`).join("")}${slots.length>12?`<span class="pmore">+${slots.length-12}</span>`:''}</div>`:''}
+      ${slots.length?`<div class="preview" onclick="toggleBoard('${e.id}',this.nextElementSibling)">${slots.slice(0,12).map(sl=>`<img class="pav" src="${safeUrl(sl.servant.face)}" title="${escapeHtml(servantLabel(sl.servant)+" · "+sl.slotLabel)}" loading="lazy" onerror="this.style.display='none'">`).join("")}${slots.length>12?`<span class="pmore">+${slots.length-12}</span>`:''}</div>`:''}
       <button class="expand-btn" data-cnt="${slots.length}" onclick="toggleBoard('${e.id}',this)">▸ ${t("expand_board")} (${slots.length})</button>
       <div class="board-view" style="display:none"></div></div>`;}).join("");
   renderPager(totalPages);
@@ -947,7 +974,7 @@ $("botLink").target="_blank";$("botLink").rel="noopener noreferrer";
 /* 初始 */
 $("lang").value=LANG;$("lang").onchange=e=>applyLang(e.target.value);
 loadServants();loadCommonCE();loadGrandGraphs();applyLang(LANG);renderBL();initAuth();
-fetchEntries().then(()=>{loading=false;refreshDB();renderStrips();showAll();loadMyBoard();});
+fetchEntries().then(()=>{loading=false;refreshDB();renderStrips();showAll();if(draftIsEmpty())loadMyBoard();});
 </script>
 </body>
 </html>
