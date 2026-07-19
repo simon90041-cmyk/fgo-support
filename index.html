@@ -609,17 +609,35 @@ let COMMON_CE=[];const COMMON_CE_IDS=[
   {id:9401370,cat:"atk"},{id:9401470,cat:"atk"},
   // 近期實裝
   {id:9409220,cat:"atk"},{id:9409230,cat:"atk"},{id:9409240,cat:"atk"},
-  // QP / 加絆
-  {id:9400780,cat:"bonus"},{id:9403690,cat:"bonus"},{id:9401970,cat:"bonus"},{id:9403520,cat:"bonus"},
-  {id:9403990,cat:"bonus"}];  // 名探偵フォウムズ（QP＋加絆 雙效）
+  // 經驗／加成（QP・加絆・御主EXP）——依 Atlas 功能類型 qpDropUp / servantFriendshipUp / expUp 全數收錄的 5★
+  ...[9400780,9401340,9401970,9403520,9403690,9403870,9403990,9404180,9404310,9404360,
+      9404540,9404630,9404870,9405110,9405170,9405490,9405630,9405710,9406010,9406200,
+      9406740,9406960,9407060,9407110,9407360,9407480,9407740,9407850,9408060,9408220,
+      9408390,9408540,9408590,9408600,9408650,9408700,9408710,9408800,9408810,9408840,
+      9408920,9408970,9408980,9408990,9409210,9409320].map(id=>({id,cat:"bonus"}))];
 const BOND_CE_SVT=[284,215,316,150];/* Castoria、斯卡蒂、奧伯隆、梅林 的羈絆禮裝 */
+/* 禮裝索引：整批抓 JP+TW 匯出檔各一次（各約 675KB、gzip 後很小），
+   取代「每張禮裝打 4 次 API」，加再多張也不會增加請求數 */
+let EQUIP_INDEX=null,equipIdxP=null;
+function loadEquipIndex(){if(equipIdxP)return equipIdxP;
+  equipIdxP=(async()=>{const idx={};
+    const [jp,tw]=await Promise.all([
+      fetch(`${API}/export/JP/basic_equip.json`).then(x=>x.json()).catch(()=>[]),
+      fetch(`${API}/export/TW/basic_equip.json`).then(x=>x.json()).catch(()=>[])]);
+    (jp||[]).forEach(e=>{idx[e.id]={id:e.id,ja:e.name,face:e.face,rarity:e.rarity};});
+    (tw||[]).forEach(e=>{const o=idx[e.id]||(idx[e.id]={id:e.id,rarity:e.rarity,face:e.face});o.tw=e.name;if(!o.face)o.face=e.face;});
+    EQUIP_INDEX=idx;return idx;})();
+  return equipIdxP;}
+function equipById(id){return EQUIP_INDEX?EQUIP_INDEX[id]:null;}
 async function loadEquipById(id){const regions=[["JP","ja"],["NA","en"],["CN","cn"],["TW","tw"]];const ce={id};
   await Promise.all(regions.map(async([r,key])=>{try{const d=await fetch(`${API}/basic/${r}/equip/${id}`).then(x=>x.json());if(d&&d.name){ce[key]=d.name;if(!ce.face)ce.face=d.face;if(ce.rarity==null)ce.rarity=d.rarity;}}catch{}}));
   return ce.face?ce:null;}
-async function loadCommonCE(){const gen=[],bond=[];
-  await Promise.all(COMMON_CE_IDS.map(async(s,i)=>{try{const ce=await loadEquipById(s.id);if(ce)gen[i]={...ce,cat:s.cat};}catch{}}));
-  await Promise.all(BOND_CE_SVT.map(async(c,i)=>{try{const sv=await fetch(`${API}/nice/JP/servant/${c}?lore=false`).then(x=>x.json());if(sv&&sv.bondEquip){const ce=await loadEquipById(sv.bondEquip);if(ce)bond[i]={...ce,cat:"bond"};}}catch{}}));
-  COMMON_CE=[...gen.filter(Boolean),...bond.filter(Boolean)];}   // 保留指定順序
+async function loadCommonCE(){await loadEquipIndex();const gen=[],bond=[];
+  COMMON_CE_IDS.forEach((s,i)=>{const ce=equipById(s.id);if(ce)gen[i]={...ce,cat:s.cat};});
+  await Promise.all(BOND_CE_SVT.map(async(c,i)=>{try{const sv=await fetch(`${API}/nice/JP/servant/${c}?lore=false`).then(x=>x.json());
+    if(sv&&sv.bondEquip){const ce=equipById(sv.bondEquip)||await loadEquipById(sv.bondEquip);if(ce)bond[i]={...ce,cat:"bond"};}}catch{}}));
+  COMMON_CE=[...gen.filter(Boolean),...bond.filter(Boolean)];    // 保留指定順序
+  if(CE_NAME_MAP)fillNames(COMMON_CE,CE_NAME_MAP);}
 function makeEquipSearcher(inputId,sugId,onPick,listFn){
   const input=$(inputId),sug=$(sugId);let timer=null;
   const quick=()=>(listFn?listFn():COMMON_CE)||[];
@@ -726,7 +744,8 @@ async function autoFillBondCe(){if(!edServant||!$("edGrand").checked)return;
   try{const sv=await fetch(`${API}/nice/JP/servant/${edServant.collectionNo}?lore=false`).then(x=>x.json());
     const ids=(sv&&(sv.bondEquips&&sv.bondEquips.length?sv.bondEquips:(sv.bondEquip?[sv.bondEquip]:[])))||[];
     if(!ids.length){CUR_BOND_CES=[];return;}
-    const list=(await Promise.all(ids.map(id=>loadEquipById(id)))).filter(Boolean);
+    await loadEquipIndex();
+    const list=(await Promise.all(ids.map(async id=>equipById(id)||await loadEquipById(id)))).filter(Boolean);
     CUR_BOND_CES=list.map(c=>({...c,cat:"bond"}));
     if(list.length&&!edCeBond&&$("edGrand").checked){edCeBond=CUR_BOND_CES[0];renderEdCeBondPicked();}
   }catch{}}
@@ -742,7 +761,8 @@ makeEquipSearcher("edCeBonus","edCeBonusSug",async s=>{edCeBonus={id:s.id,ja:s.j
   ()=>COMMON_CE.filter(c=>c.cat==="bonus"));                   // ③ 只列 QP／加絆 類
 makeServantSearcher("edSearch","edSug",s=>{edServant=pickServant(s);CUR_BOND_CES=[];renderEdPicked();syncGrandEligibility();autoFillBondCe();},()=>SLOT_BY_KEY[editingKey]?SLOT_BY_KEY[editingKey].cls:null,()=>draftServantIds(currentBoard,editingKey));
 makeEquipSearcher("edCe","edCeSug",async s=>{edCE={id:s.id,ja:s.ja,en:s.en,tw:s.tw,cn:s.cn,rarity:s.rarity,face:s.face,lb:+$("edCeLb").value};renderEdCePicked();
-  const names=await fetchCeNames(s.id);edCE={...edCE,...names};renderEdCePicked();});
+  const names=await fetchCeNames(s.id);edCE={...edCE,...names};renderEdCePicked();},
+  ()=>COMMON_CE.filter(c=>c.cat!=="bonus"));   // ① 常規：輸出/功能性＋羈絆，加成類留給 ③
 $("edApply").onclick=()=>{if(!edServant){toast(t("toast_need_servant"));return;}
   if(edServant.collectionNo!=null&&draftServantIds(currentBoard,editingKey).has(edServant.collectionNo)){toast(t("dup_hint"));return;}
   boardDraft[currentBoard][editingKey]={servant:edServant,np:+$("edNp").value.replace("NP",""),level:parseInt($("edLv").value)||null,
