@@ -86,6 +86,21 @@
   .dup-tag{font-size:11px;color:var(--gold2);background:color-mix(in srgb,var(--gold2) 16%,transparent);border:1px solid color-mix(in srgb,var(--gold2) 45%,transparent);border-radius:10px;padding:1px 6px;margin-left:6px;white-space:nowrap}
   .dup-tag.blocked{color:var(--danger);background:color-mix(in srgb,var(--danger) 15%,transparent);border-color:color-mix(in srgb,var(--danger) 50%,transparent)}
   .sug-item.dup{cursor:not-allowed;opacity:.6}.sug-item.dup:hover{background:transparent}
+  /* 使用排行 */
+  .rk-note{font-size:12px;color:var(--muted);margin:10px 0 4px}
+  .rk-h{margin:16px 0 6px;font-size:13px;font-weight:700;color:var(--gold2);border-bottom:1px solid var(--line);padding-bottom:5px}
+  .rk-row{display:flex;align-items:center;gap:10px;padding:6px 0}
+  .rk-no{width:22px;text-align:center;font-weight:800;font-size:13px;color:var(--muted);flex-shrink:0}
+  .rk-no.top{color:var(--gold2)}
+  .rk-imgs{position:relative;width:40px;height:40px;flex-shrink:0}
+  .rk-imgs img{width:40px;height:40px;border-radius:6px;background:#000;object-fit:cover}
+  .rk-imgs img.rk-ce{position:absolute;right:-6px;bottom:-4px;width:22px;height:22px;border:1px solid var(--accent2);border-radius:4px}
+  .rk-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+  .rk-name{font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rk-sub{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rk-bar{height:4px;background:var(--panel2);border-radius:3px;overflow:hidden;margin-top:2px}
+  .rk-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--gold2))}
+  .rk-n{font-size:13px;font-weight:800;color:var(--gold2);flex-shrink:0}.rk-n small{font-weight:400;color:var(--muted);font-size:11px}
   .strip-label{font-size:12px;color:var(--muted);margin:6px 0 5px}
   .clsstrip{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
   .clschip{padding:5px 11px;border-radius:20px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:12px;cursor:pointer}
@@ -223,6 +238,7 @@
       <div class="tab active" data-pane="p1"><span class="t-num">1</span><span data-i18n="tab1">好友編號查詢</span></div>
       <div class="tab" data-pane="p2"><span class="t-num">2</span><span data-i18n="tab2">從者搜尋</span></div>
       <div class="tab" data-pane="p3"><span class="t-num">3</span><span data-i18n="tab3">多條件搜尋</span></div>
+      <div class="tab" data-pane="p4"><span class="t-num">📊</span><span data-i18n="tab4">使用排行</span></div>
     </div>
     <div class="pane active" id="p1">
       <div class="sec-sub" data-i18n="q1_sub" style="margin-bottom:8px">查詢某位玩家的整套助戰板</div>
@@ -278,6 +294,16 @@
         <div style="flex:2"><button class="btn full" style="margin-top:0" id="q3btn" data-i18n="btn_search_support">搜尋助戰</button></div>
         <div style="flex:1"><button class="btn sec full" style="margin-top:0" id="q3reset" data-i18n="btn_reset">重設</button></div>
       </div>
+    </div>
+
+    <div class="pane" id="p4">
+      <div class="sec-sub" data-i18n="rank_sub" style="margin-bottom:10px">看看大家的助戰都放誰、配什麼禮裝，不知道怎麼配的時候可以參考</div>
+      <div class="row" style="align-items:flex-end">
+        <div><label data-i18n="lbl_server">伺服器</label>
+          <select id="rankSrv"><option value="" data-i18n="srv_all">全部</option><option value="JP" data-i18n="srv_jp">日服</option><option value="NA" data-i18n="srv_na">美服</option><option value="TW" data-i18n="srv_tw">台服</option><option value="CN" data-i18n="srv_cn">國服</option></select></div>
+        <div><label data-i18n="lbl_class">職階</label><select id="rankClass"></select></div>
+      </div>
+      <div id="rankOut"></div>
     </div>
   </div>
 
@@ -390,7 +416,7 @@
 /* ================= i18n ================= */
 const I18N={
  "zh-TW":{app_sub:"登記你的助戰陣容，或搜尋其他玩家的好友編號 · 全網共享、免費使用",db_label:"DB：",db_unit:"筆",stat_line:"<b>{p}</b> 位玩家 · 共 <b>{s}</b> 位助戰從者",
-  tab1:"好友編號查詢",tab2:"從者搜尋",tab3:"進階搜尋",loading:"載入中…",q1_sub:"查詢某位玩家的整套助戰板",q1_ph:"輸入好友編號（12 位數字）",btn_query:"查詢",
+  tab1:"好友編號查詢",tab2:"從者搜尋",tab3:"進階搜尋",tab4:"使用排行",rank_sub:"看看大家的助戰都放誰、配什麼禮裝，不知道怎麼配的時候可以參考",rank_svt:"最多人放的從者",rank_ce:"最多人用的禮裝",rank_combo:"最熱門的從者＋禮裝搭配",rank_players:"人",rank_based:"統計自 {n} 筆登記（同一位玩家重複放只計一次）",rank_none:"這個條件下還沒有資料",loading:"載入中…",q1_sub:"查詢某位玩家的整套助戰板",q1_ph:"輸入好友編號（12 位數字）",btn_query:"查詢",
   q2_sub:"找出助戰板中含有指定從者的玩家",lbl_servant:"助戰從者",servant_ph:"輸入從者中／英文名，如 梅林 / Merlin",lbl_minnp:"最低寶具等級(NP) ≥",lbl_server:"伺服器",srv_all:"全部",btn_search:"搜尋",
   q3_sub:"在助戰板中，找到「同一格」同時符合多個條件的玩家",grp_slot_servant:"職階 / 從者",lbl_class:"職階",lbl_np_ge:"寶具 NP ≥",lbl_servant_opt:"指定從者（選填）",servant_opt_ph:"不限從者，或輸入中／英文名指定",
   grp_skill_ce_srv:"寶具 / 技能 / 禮裝 / 伺服器",lbl_skill_ge:"每個技能 ≥",opt_unlimited:"不限",skill_max10:"10（滿技）",lbl_as_which:"指定附加技能 AS",lbl_as_ge:"該 AS 等級 ≥",chk_mlb:"滿破禮裝",grand_on:"👑 冠位配置（可裝 3 張禮裝）",lbl_ce_bond:"② 專屬羈絆禮裝",ed_ce_bond_ph:"選好從者會自動帶入，如 約定之刻",ed_ce_bonus_ph:"如 蒙娜麗莎 / 迦勒底午餐時光",lbl_bond_mode:"羈絆禮裝效果",bond_orig:"原效果",bond_np50:"初始 50NP",lbl_ce_bonus:"③ 經驗／加成禮裝",only_grand:"只看冠位",grand_short:"冠位配置",grand_prefix:"冠位",grand_need_svt:"請先選擇從者",grand_no_class:"此職階無冠位資格",grand_need_cond:"冠位資格需 Lv{lv} 且技能全 {sk}",btn_search_support:"搜尋助戰",btn_reset:"重設",
@@ -404,7 +430,7 @@ const I18N={
   confirm_del:"確定刪除這筆登記？",btn_del:"刪除",bl_title:"屏蔽",bl_block:"屏蔽",bl_unblock:"解除",bl_empty:"尚無屏蔽用戶",bl_blocked_toast:"已屏蔽",bl_unblocked_toast:"已解除屏蔽",list_empty:"沒有符合的登記。到下方登記你的助戰板吧！",err_load:"讀取失敗，請檢查網路",err_action:"操作失敗",err_save:"儲存失敗：",err_del:"刪除失敗",more_actions:"更多",
   dis1:"本站僅供玩家自行登記分享好友編號，所有資料由使用者手動輸入。從者與禮裝資料來源：Atlas Academy（api.atlasacademy.io）。",dis2:"本站與 TYPE-MOON / Aniplex / DELiGHTWORKS 無關，不會、也無法讀取任何玩家遊戲帳號資料。",dis3:"資料儲存在雲端（Supabase），全網玩家共享。需以 Discord 登入才能登記；每個帳號每個伺服器一組助戰板，且只有本人能修改／刪除自己的登記。"},
  "zh-CN":{app_sub:"登记你的助战阵容，或搜索其他玩家的好友编号 · 全网共享、免费使用",db_label:"DB：",db_unit:"条",stat_line:"<b>{p}</b> 位玩家 · 共 <b>{s}</b> 位助战从者",
-  tab1:"好友编号查询",tab2:"从者搜索",tab3:"进阶搜索",loading:"加载中…",q1_sub:"查询某位玩家的整套助战板",q1_ph:"输入好友编号（12 位数字）",btn_query:"查询",
+  tab1:"好友编号查询",tab2:"从者搜索",tab3:"进阶搜索",tab4:"使用排行",rank_sub:"看看大家的助战都放谁、配什么礼装，不知道怎么配的时候可以参考",rank_svt:"最多人放的从者",rank_ce:"最多人用的礼装",rank_combo:"最热门的从者＋礼装搭配",rank_players:"人",rank_based:"统计自 {n} 笔登记（同一位玩家重复放只计一次）",rank_none:"这个条件下还没有数据",loading:"加载中…",q1_sub:"查询某位玩家的整套助战板",q1_ph:"输入好友编号（12 位数字）",btn_query:"查询",
   q2_sub:"找出助战板中含有指定从者的玩家",lbl_servant:"助战从者",servant_ph:"输入从者中／英文名，如 梅林 / Merlin",lbl_minnp:"最低宝具等级(NP) ≥",lbl_server:"服务器",srv_all:"全部",btn_search:"搜索",
   q3_sub:"在助战板中，找到「同一格」同时符合多个条件的玩家",grp_slot_servant:"职阶 / 从者",lbl_class:"职阶",lbl_np_ge:"宝具 NP ≥",lbl_servant_opt:"指定从者（选填）",servant_opt_ph:"不限从者，或输入中／英文名指定",
   grp_skill_ce_srv:"宝具 / 技能 / 礼装 / 服务器",lbl_skill_ge:"每个技能 ≥",opt_unlimited:"不限",skill_max10:"10（满技）",lbl_as_which:"指定附加技能 AS",lbl_as_ge:"该 AS 等级 ≥",chk_mlb:"满破礼装",grand_on:"👑 冠位配置（可装 3 张礼装）",lbl_ce_bond:"② 专属羁绊礼装",ed_ce_bond_ph:"选好从者会自动带入，如 约定之刻",ed_ce_bonus_ph:"如 蒙娜丽莎 / 迦勒底午餐时光",lbl_bond_mode:"羁绊礼装效果",bond_orig:"原效果",bond_np50:"初始 50NP",lbl_ce_bonus:"③ 经验／加成礼装",only_grand:"只看冠位",grand_short:"冠位配置",grand_prefix:"冠位",grand_need_svt:"请先选择从者",grand_no_class:"此职阶无冠位资格",grand_need_cond:"冠位资格需 Lv{lv} 且技能全 {sk}",btn_search_support:"搜索助战",btn_reset:"重置",
@@ -418,7 +444,7 @@ const I18N={
   confirm_del:"确定删除这笔登记？",btn_del:"删除",bl_title:"屏蔽",bl_block:"屏蔽",bl_unblock:"解除",bl_empty:"尚无屏蔽用户",bl_blocked_toast:"已屏蔽",bl_unblocked_toast:"已解除屏蔽",list_empty:"没有符合的登记。到下方登记你的助战板吧！",err_load:"读取失败，请检查网络",err_action:"操作失败",err_save:"保存失败：",err_del:"删除失败",more_actions:"更多",
   dis1:"本站仅供玩家自行登记分享好友编号，所有资料由使用者手动输入。从者与礼装资料来源：Atlas Academy（api.atlasacademy.io）。",dis2:"本站与 TYPE-MOON / Aniplex / DELiGHTWORKS 无关，不会、也无法读取任何玩家游戏账号资料。",dis3:"数据储存在云端（Supabase），全网玩家共享。需以 Discord 登录才能登记；每个账号每个服务器一组助战板，且只有本人能修改／删除自己的登记。"},
  "en":{app_sub:"Register your support servants, or find other players' friend codes · Free & shared by everyone",db_label:"DB: ",db_unit:"entries",stat_line:"<b>{p}</b> players · <b>{s}</b> support servants",
-  tab1:"Friend Code",tab2:"Servant",tab3:"Advanced",loading:"Loading…",q1_sub:"Look up a player's full support boards",q1_ph:"Enter friend code (12 digits)",btn_query:"Search",
+  tab1:"Friend Code",tab2:"Servant",tab3:"Advanced",tab4:"Rankings",rank_sub:"See which servants and CEs everyone is running — handy when you are not sure what to set.",rank_svt:"Most used servants",rank_ce:"Most used CEs",rank_combo:"Most popular servant + CE pairs",rank_players:"players",rank_based:"Based on {n} entries (each player counted once per item)",rank_none:"No data for this filter yet",loading:"Loading…",q1_sub:"Look up a player's full support boards",q1_ph:"Enter friend code (12 digits)",btn_query:"Search",
   q2_sub:"Find players whose board contains a servant",lbl_servant:"Support servant",servant_ph:"Type a servant name, e.g. Merlin",lbl_minnp:"Min NP level ≥",lbl_server:"Server",srv_all:"All",btn_search:"Search",
   q3_sub:"Find players whose single slot matches all conditions",grp_slot_servant:"Class / Servant",lbl_class:"Class",lbl_np_ge:"NP ≥",lbl_servant_opt:"Servant (optional)",servant_opt_ph:"Any servant, or type a name",
   grp_skill_ce_srv:"NP / Skills / CE / Server",lbl_skill_ge:"Each skill ≥",opt_unlimited:"Any",skill_max10:"10 (max)",lbl_as_which:"Append skill (AS)",lbl_as_ge:"AS level ≥",chk_mlb:"MLB CE",grand_on:"👑 Grand setup (3 CEs)",lbl_ce_bond:"② Bond CE",ed_ce_bond_ph:"Auto-filled from the servant's own bond CE",ed_ce_bonus_ph:"e.g. Mona Lisa / Chaldea Lunchtime",lbl_bond_mode:"Bond CE effect",bond_orig:"Original effect",bond_np50:"50% starting NP",lbl_ce_bonus:"③ EXP / bonus CE",only_grand:"Grand only",grand_short:"Grand setup",grand_prefix:"Grand ",grand_need_svt:"Pick a servant first",grand_no_class:"This class cannot become Grand",grand_need_cond:"Grand requires Lv{lv} and all skills {sk}",btn_search_support:"Search",btn_reset:"Reset",
@@ -432,7 +458,7 @@ const I18N={
   confirm_del:"Delete this entry?",btn_del:"Delete",bl_title:"Blocklist",bl_block:"Block",bl_unblock:"Unblock",bl_empty:"No blocked users",bl_blocked_toast:"User blocked",bl_unblocked_toast:"Unblocked",list_empty:"No matching entries. Register your board below!",err_load:"Failed to load. Check your connection.",err_action:"Action failed",err_save:"Save failed: ",err_del:"Delete failed",more_actions:"More",
   dis1:"This site is for players to voluntarily register and share friend codes; all data is entered manually. Servant/CE data: Atlas Academy (api.atlasacademy.io).",dis2:"Not affiliated with TYPE-MOON / Aniplex / DELiGHTWORKS. It does not and cannot read any player game account data.",dis3:"Data is stored in the cloud (Supabase) and shared by all players. Discord login is required to register; one board per account per server, and you can only edit/delete your own entries."},
  "ja":{app_sub:"あなたのサポート編成を登録、または他プレイヤーのフレンドIDを検索 · 全体共有・無料",db_label:"DB：",db_unit:"件",stat_line:"<b>{p}</b> 人が登録 · 計 <b>{s}</b> 騎のサポート",
-  tab1:"フレンドID検索",tab2:"サーヴァント検索",tab3:"詳細検索",loading:"読み込み中…",q1_sub:"プレイヤーのサポート編成を検索",q1_ph:"フレンドID（12桁）を入力",btn_query:"検索",
+  tab1:"フレンドID検索",tab2:"サーヴァント検索",tab3:"詳細検索",tab4:"使用ランキング",rank_sub:"みんながどのサーヴァント・礼装を置いているかの参考に",rank_svt:"よく置かれるサーヴァント",rank_ce:"よく使われる礼装",rank_combo:"人気のサーヴァント＋礼装",rank_players:"人",rank_based:"{n} 件の登録から集計（同一プレイヤーは1回のみ）",rank_none:"この条件のデータはまだありません",loading:"読み込み中…",q1_sub:"プレイヤーのサポート編成を検索",q1_ph:"フレンドID（12桁）を入力",btn_query:"検索",
   q2_sub:"指定サーヴァントを編成しているプレイヤーを検索",lbl_servant:"サポートサーヴァント",servant_ph:"サーヴァント名を入力（例：マーリン / Merlin）",lbl_minnp:"最低宝具レベル(NP) ≥",lbl_server:"サーバー",srv_all:"すべて",btn_search:"検索",
   q3_sub:"同一スロットで全条件を満たすプレイヤーを検索",grp_slot_servant:"クラス / サーヴァント",lbl_class:"クラス",lbl_np_ge:"宝具 NP ≥",lbl_servant_opt:"サーヴァント（任意）",servant_opt_ph:"指定なし、または名前を入力",
   grp_skill_ce_srv:"宝具 / スキル / 礼装 / サーバー",lbl_skill_ge:"各スキル ≥",opt_unlimited:"指定なし",skill_max10:"10（カンスト）",lbl_as_which:"アペンドスキル(AS)",lbl_as_ge:"AS レベル ≥",chk_mlb:"最大突破礼装",grand_on:"👑 冠位編成（礼装3枠）",lbl_ce_bond:"② 専用絆礼装",ed_ce_bond_ph:"サーヴァント選択で自動入力（例：約束の刻）",ed_ce_bonus_ph:"例：モナ・リザ／カルデア・ランチタイム",lbl_bond_mode:"絆礼装の効果",bond_orig:"本来の効果",bond_np50:"NP初期50%",lbl_ce_bonus:"③ 経験値／ボーナス礼装",only_grand:"冠位のみ",grand_short:"冠位編成",grand_prefix:"グランド",grand_need_svt:"先にサーヴァントを選択",grand_no_class:"このクラスは冠位不可",grand_need_cond:"冠位条件：Lv{lv}・スキル全{sk}",btn_search_support:"検索",btn_reset:"リセット",
@@ -928,7 +954,49 @@ function refreshDB(){
   let svt=0;es.forEach(e=>{svt+=slotsOf(e).length;});
   $("dbCount").innerHTML=t("stat_line").replace("{p}",players).replace("{s}",svt);
   const sel=$("q3class");const cur=sel.value;
-  sel.innerHTML=`<option value="">${t("opt_unlimited")}</option>`+CLASSES_15.map(c=>`<option value="${c.key}">${classLabel(c.key)}</option>`).join("");sel.value=cur;}
+  sel.innerHTML=`<option value="">${t("opt_unlimited")}</option>`+CLASSES_15.map(c=>`<option value="${c.key}">${classLabel(c.key)}</option>`).join("");sel.value=cur;
+  const rs=$("rankClass");if(rs){const rc=rs.value;
+    rs.innerHTML=`<option value="">${t("opt_unlimited")}</option>`+CLASSES_15.map(c=>`<option value="${c.key}">${classLabel(c.key)}</option>`).join("");rs.value=rc;}
+  if($("rankOut"))renderRank();}
+/* ===== 使用排行 =====
+   以「有幾位玩家在用」計算，而不是算格位數 —— 否則一個人把同一位放進 6 個支援欄
+   就會灌爆排名。每位玩家對同一項目只計一次。 */
+function rankTally(srv,cls){
+  const svt=new Map(),ce=new Map(),combo=new Map();
+  const bump=(m,k,info)=>{const r=m.get(k)||{n:0,...info};r.n++;m.set(k,r);};
+  const rows=load().filter(e=>!srv||e.server===srv);
+  rows.forEach(e=>{
+    const s1=new Map(),c1=new Map(),k1=new Map();
+    slotsOf(e).forEach(sl=>{
+      const sv=sl.servant;if(!sv)return;
+      if(cls&&!classMatch(sv.className,cls))return;
+      if(sv.collectionNo!=null)s1.set(sv.collectionNo,{face:sv.face,name:servantLabel(sv),sub:"★".repeat(sv.rarity||0)});
+      [sl.ce,sl.ceBond,sl.ceBonus].filter(Boolean).forEach(c=>{
+        if(c.id!=null)c1.set(c.id,{face:c.face,name:ceName(c),sub:"★".repeat(c.rarity||0)});});
+      if(sv.collectionNo!=null&&sl.ce&&sl.ce.id!=null)
+        k1.set(sv.collectionNo+"|"+sl.ce.id,{face:sv.face,face2:sl.ce.face,name:servantLabel(sv),sub:"🎴 "+ceName(sl.ce)});
+    });
+    s1.forEach((v,k)=>bump(svt,k,v));c1.forEach((v,k)=>bump(ce,k,v));k1.forEach((v,k)=>bump(combo,k,v));
+  });
+  const top=m=>[...m.values()].sort((a,b)=>b.n-a.n).slice(0,10);
+  return {players:rows.length,svt:top(svt),ce:top(ce),combo:top(combo)};}
+function rankList(items,total){
+  if(!items.length)return `<div class="hint" style="padding:8px 0">—</div>`;
+  const max=items[0].n||1;
+  return items.map((it,i)=>`<div class="rk-row">
+    <span class="rk-no${i<3?" top":""}">${i+1}</span>
+    <span class="rk-imgs"><img src="${safeUrl(it.face)}" onerror="this.style.visibility='hidden'">${it.face2?`<img class="rk-ce" src="${safeUrl(it.face2)}" onerror="this.style.visibility='hidden'">`:""}</span>
+    <span class="rk-info"><span class="rk-name">${escapeHtml(it.name)}</span><span class="rk-sub">${escapeHtml(it.sub||"")}</span>
+      <span class="rk-bar"><i style="width:${Math.round(it.n/max*100)}%"></i></span></span>
+    <span class="rk-n">${it.n}<small> ${t("rank_players")}</small></span></div>`).join("");}
+function renderRank(){
+  const box=$("rankOut");if(!box)return;
+  const d=rankTally($("rankSrv").value,$("rankClass").value);
+  if(!d.players){box.innerHTML=`<div class="empty">${t("rank_none")}</div>`;return;}
+  box.innerHTML=`<div class="rk-note">${t("rank_based").replace("{n}",d.players)}</div>
+    <div class="rk-h">🧙 ${t("rank_svt")}</div>${rankList(d.svt)}
+    <div class="rk-h">🎴 ${t("rank_ce")}</div>${rankList(d.ce)}
+    <div class="rk-h">🔗 ${t("rank_combo")}</div>${rankList(d.combo)}`;}
 function slotPassFilter(sl){if(activeBoard.size&&!activeBoard.has(sl.boardKey))return false;if(activeClass.size&&![...activeClass].some(c=>classMatch(sl.servant.className,c)))return false;if(activeRar.size&&!activeRar.has(String(sl.servant.rarity)))return false;return true;}
 /* 複選晶片列：「全部」= 清空選取；其餘可多選（toggle） */
 function chipStrip(id,items,set,isRar){const el=$(id);if(!el)return;
@@ -1020,6 +1088,7 @@ function renderPager(totalPages){const p=$("pager");if(!p)return;if(totalPages<=
   pageRange(curPage,totalPages).forEach(n=>{h+= n==="..."?'<span class="pgdots">…</span>':mk(n,n,false,n===curPage);});
   h+=mk(curPage+1,"›",curPage>=totalPages,false);p.innerHTML=h;}
 function gotoPage(n){curPage=Math.max(1,parseInt(n)||1);renderList(lastItems,lastDesc,true);const s=$("clsstrip");if(s)s.scrollIntoView({behavior:"smooth",block:"start"});}
+["rankSrv","rankClass"].forEach(id=>{const el=$(id);if(el)el.onchange=renderRank;});
 $("clearFilter").onclick=()=>{activeClass.clear();activeRar.clear();activeSrv.clear();activeBoard.clear();q2Servant=null;$("q2picked").innerHTML="";
   onlyRecruiting=false;$("recruitFilter").classList.remove("active");
   onlyGrand=false;$("grandFilter").classList.remove("active");
