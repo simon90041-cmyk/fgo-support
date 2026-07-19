@@ -637,7 +637,7 @@ function makeEquipSearcher(inputId,sugId,onPick,listFn){
       if(sug.style.display==="block"&&!input.value.trim())renderCe(quick());});});
 }
 /* 點「已選」的卡片即可重新挑選，不必先按 ✕（blur→focus 確保重新觸發下拉） */
-function reopenPick(inputId){const el=$(inputId);if(!el)return;el.value="";el.blur();el.focus();}
+function reopenPick(inputId){const el=$(inputId);if(!el)return;el.value="";el.focus();el.dispatchEvent(new Event("focus"));}
 document.addEventListener("click",e=>{if(!e.target.closest(".search-box"))document.querySelectorAll(".suggestions").forEach(s=>s.style.display="none");});
 
 /* Tabs */
