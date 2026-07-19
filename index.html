@@ -907,7 +907,7 @@ function renderList(items,desc,keepPage){
       <span class="entry-actions"><button class="more-btn" onclick="toggleMenu(event,this)" title="更多">⋯</button><div class="more-menu">${mine?`<div class="mi del" onclick="del('${e.id}')">🗑 ${t("btn_del")}</div>`:''}<div class="mi" onclick="block('${e.friendCode}')">🚫 ${t("bl_block")}</div></div></span></div>
       ${e.note?`<div class="entry-note">📝 ${escapeHtml(e.note)}</div>`:''}
       ${e.updatedAt?`<div class="entry-updated">🕒 ${t("updated_lbl")} ${timeAgo(e.updatedAt)}</div>`:''}
-      ${slots.length?`<div class="preview" onclick="toggleBoard('${e.id}',this.nextElementSibling)">${slots.slice(0,12).map(sl=>`<img class="pav" src="${sl.servant.face}" title="${servantLabel(sl.servant)} · ${sl.slotLabel}" loading="lazy" onerror="this.style.display='none'">`).join("")}${slots.length>12?`<span class="pmore">+${slots.length-12}</span>`:''}</div>`:''}
+      ${slots.length?`<div class="preview" onclick="toggleBoard('${e.id}',this.nextElementSibling)">${slots.slice(0,12).map(sl=>`<img class="pav" src="${sl.servant.face}" title="${escapeHtml(servantLabel(sl.servant)+" · "+sl.slotLabel)}" loading="lazy" onerror="this.style.display='none'">`).join("")}${slots.length>12?`<span class="pmore">+${slots.length-12}</span>`:''}</div>`:''}
       <button class="expand-btn" data-cnt="${slots.length}" onclick="toggleBoard('${e.id}',this)">▸ ${t("expand_board")} (${slots.length})</button>
       <div class="board-view" style="display:none"></div></div>`;}).join("");
   renderPager(totalPages);
@@ -922,7 +922,7 @@ function renderPager(totalPages){const p=$("pager");if(!p)return;if(totalPages<=
   let h=mk(curPage-1,"‹",curPage<=1,false);
   pageRange(curPage,totalPages).forEach(n=>{h+= n==="..."?'<span class="pgdots">…</span>':mk(n,n,false,n===curPage);});
   h+=mk(curPage+1,"›",curPage>=totalPages,false);p.innerHTML=h;}
-function gotoPage(n){curPage=n;renderList(lastItems,lastDesc,true);const s=$("clsstrip");if(s)s.scrollIntoView({behavior:"smooth",block:"start"});}
+function gotoPage(n){curPage=Math.max(1,parseInt(n)||1);renderList(lastItems,lastDesc,true);const s=$("clsstrip");if(s)s.scrollIntoView({behavior:"smooth",block:"start"});}
 $("clearFilter").onclick=()=>{activeClass.clear();activeRar.clear();activeSrv.clear();activeBoard.clear();q2Servant=null;$("q2picked").innerHTML="";
   onlyRecruiting=false;$("recruitFilter").classList.remove("active");
   onlyGrand=false;$("grandFilter").classList.remove("active");
