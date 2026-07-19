@@ -1002,6 +1002,12 @@ function saveBL(a){localStorage.setItem(BL_KEY,JSON.stringify(a));}
 function block(code){const bl=loadBL();if(!bl.includes(code)){bl.push(code);saveBL(bl);}renderBL();toast(t("bl_blocked_toast"));renderList(lastItems,lastDesc,true);}
 /* ===== 檢舉 ===== */
 let rpEntry=null;
+/* 檢舉原因一律存「代碼｜繁中說明」：代碼方便程式比對，繁中方便站長直接讀懂，
+   不論檢舉者使用哪種語言介面都一致 */
+const RP_REASONS={impersonate:"rp_r1",fake:"rp_r2",text:"rp_r3",other:"rp_r4"};
+function reasonLabel(code){const k=RP_REASONS[code];
+  const zh=(k&&I18N["zh-TW"]&&I18N["zh-TW"][k])||code;
+  return (code+"｜"+zh).slice(0,40);}
 function openReport(id,code,server){
   rpEntry={id,code,server};
   $("rpTarget").textContent=`${safeCode(code)}（${srvName(server)}）`;
@@ -1017,7 +1023,7 @@ async function sendReport(){
     const {data:{user}}=await sb.auth.getUser();
     const {error}=await sb.from("reports").insert({
       entry_id:rpEntry.id,code:safeCode(rpEntry.code),server:rpEntry.server,
-      reason:$("rpReason").value,detail:detail.slice(0,500),
+      reason:reasonLabel($("rpReason").value),detail:detail.slice(0,500),
       contact:$("rpContact").value.trim().slice(0,120)||null,
       reporter:user?user.id:null});
     if(error)throw error;
