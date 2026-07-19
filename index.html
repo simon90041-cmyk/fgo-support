@@ -299,8 +299,8 @@
       <button class="btn sec" style="padding:6px 14px;font-size:12px" id="blToggle">🚫 <span data-i18n="bl_title">黑名單</span> (<span id="blCount">0</span>)</button>
       <span style="margin-left:auto;display:flex;align-items:center;gap:6px"><span class="strip-label" style="margin:0" data-i18n="sort_by">排序</span>
         <select id="sortSel" style="width:auto;padding:6px 10px;font-size:12px">
+          <option value="updated" data-i18n="sort_updated" selected>最近更新</option>
           <option value="likes" data-i18n="sort_likes">讚數優先</option>
-          <option value="updated" data-i18n="sort_updated">最近更新</option>
           <option value="new" data-i18n="sort_new">最新登記</option>
         </select></span>
     </div>
@@ -910,7 +910,7 @@ $("q3btn").onclick=()=>{const cls=$("q3class").value,rar=+$("q3rar").value,minNp
 $("q3reset").onclick=()=>{q3Servant=null;$("q3picked").innerHTML="";$("q3search").value="";q3CE=null;$("q3cePicked").innerHTML="";$("q3ce").value="";$("q3class").value="";$("q3rar").value="0";$("q3np").value="0";$("q3skill").value="0";$("q3srv").value="";$("q3aswhich").value="0";$("q3aslv").value="0";$("q3mlb").checked=false;$("q3note").value="";showAll();};
 
 /* ================= 顯示 ================= */
-let activeClass=new Set(),activeRar=new Set(),activeSrv=new Set(),activeBoard=new Set(),lastItems=[],lastDesc="",loading=true,onlyRecruiting=false,onlyGrand=false,SORT="likes",lastQueryLabel="";
+let activeClass=new Set(),activeRar=new Set(),activeSrv=new Set(),activeBoard=new Set(),lastItems=[],lastDesc="",loading=true,onlyRecruiting=false,onlyGrand=false,SORT="updated",lastQueryLabel="";   /* 預設以最後更新排序：新鮮的助戰板優先 */
 function timeAgo(iso){if(!iso)return"";const d=(Date.now()-new Date(iso).getTime())/1000;if(d<60)return t("ago_now");if(d<3600)return Math.floor(d/60)+t("ago_min");if(d<86400)return Math.floor(d/3600)+t("ago_hr");return Math.floor(d/86400)+t("ago_day");}
 function applySort(arr){const a=arr.slice();if(SORT==="new")a.sort((x,y)=>(y.createdAt||"").localeCompare(x.createdAt||""));
   else if(SORT==="updated")a.sort((x,y)=>(y.updatedAt||"").localeCompare(x.updatedAt||""));
@@ -1045,6 +1045,16 @@ $("botLink").target="_blank";$("botLink").rel="noopener noreferrer";
 $("lang").value=LANG;$("lang").onchange=e=>applyLang(e.target.value);
 /* 禮裝索引(1.35MB)與冠位資料只有「登記/挑禮裝」才用得到 →
    不放在開站路徑，改成第一次開編輯器或點禮裝欄位時才載，純瀏覽的訪客完全不用付這個成本 */
+/* 匿名流量統計：無 cookie、不記錄個資，資料寫進自己的 Supabase。
+   同一次瀏覽階段只記一次，失敗完全靜默、絕不影響網站運作 */
+(function(){try{
+  let s=sessionStorage.getItem("fgo_sess");
+  if(!s){s=Math.random().toString(36).slice(2,12);sessionStorage.setItem("fgo_sess",s);}
+  sb.from("page_views").insert({
+    path:(location.pathname+location.search).slice(0,200),
+    ref:(document.referrer||"").slice(0,300)||null,
+    lang:LANG,sess:s}).then(()=>{},()=>{});
+}catch(e){}})();
 loadServants();applyLang(LANG);renderBL();initAuth();
 fetchEntries().then(()=>{loading=false;refreshDB();renderStrips();
   openSharedCode();                      // 有 ?code= 就直接開那筆，否則顯示全部
