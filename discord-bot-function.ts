@@ -22,18 +22,79 @@ function sName(s: any): string {
   if (cn) return s.en && s.en !== cn ? `${cn}（${s.en}）` : cn;
   return s.en || s.ja || "?";
 }
+function ceN(c: any): string {
+  return c ? (c.tw || c.cn || c.en || c.ja || "") : "";
+}
 function ceLb(lb: number): string {
   return lb === 4 ? "（滿破）" : lb > 0 ? `（${lb}突）` : "";
 }
-function fmtBoard(r: any): string {
-  const parts: string[] = [`👤 **${r.friend_code}**（${SRV[r.server] || r.server}）${r.note ? ` · 📝${r.note}` : ""}`];
+function ago(iso: string): string {
+  const d = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (d < 3600) return `${Math.max(1, Math.floor(d / 60))}分前`;
+  if (d < 86400) return `${Math.floor(d / 3600)}小時前`;
+  return `${Math.floor(d / 86400)}天前`;
+}
+
+/** 卡片標題：編號・伺服器・好友狀態・讚數・更新時間・註記 */
+function headerOf(r: any): string {
+  const status = r.is_full ? "🔴好友已滿" : "🟢徵求好友";
+  const likes = r.like_count ? ` · 👍${r.like_count}` : "";
+  const upd = r.updated_at ? ` · 🕒${ago(r.updated_at)}` : "";
+  const note = r.note ? ` · 📝${r.note}` : "";
+  return `👤 **${r.friend_code}**（${SRV[r.server] || r.server}）${status}${likes}${upd}${note}`;
+}
+
+/** 單一格位：冠位👑・稀有度★・NP/Lv/技能/AS・最多 3 張禮裝 */
+function slotLine(sl: any): string {
+  const stars = "★".repeat(sl.servant?.rarity || 0);
+  const np = Number(sl.np) >= 5 ? "**NP5**" : `NP${sl.np}`;
+  const lvNum = Number(sl.level) || 0;
+  const lv = lvNum >= 100 ? `**Lv${lvNum}**` : `Lv${sl.level || "?"}`;
+  const asArr = sl.as || [];
+  const as = asArr.some((x: number) => x > 0) ? `·AS${asArr.join("/")}` : "";
+  const crown = sl.grand ? "👑" : "";
+  const ces: string[] = [];
+  if (sl.ce) ces.push(`🎴${ceN(sl.ce)}${ceLb(sl.ce.lb)}`);
+  if (sl.ceBond) ces.push(`🎴${ceN(sl.ceBond)}${sl.ceBond.mode === "np50" ? "[初始50NP]" : ""}`);
+  if (sl.ceBonus) ces.push(`🎴${ceN(sl.ceBonus)}`);
+  const head = `　${crown}${stars} ${sName(sl.servant)} ${np}·${lv}·技${(sl.skills || []).join("/")}${as}`;
+  return ces.length ? `${head}\n　　${ces.join(" · ")}` : head;
+}
+
+function allSlots(r: any): any[] {
+  const out: any[] = [];
   for (const bk of Object.keys(r.boards || {})) {
-    for (const sk of Object.keys(r.boards[bk])) {
-      const sl = r.boards[bk][sk];
-      parts.push(`　${sName(sl.servant)} NP${sl.np}·Lv${sl.level || "?"}·技${(sl.skills || []).join("/")}${sl.ce ? `·${sl.ce.tw || sl.ce.cn || sl.ce.en || ""}${ceLb(sl.ce.lb)}` : ""}`);
-    }
+    for (const sk of Object.keys(r.boards[bk] || {})) out.push(r.boards[bk][sk]);
   }
-  return parts.join("\n");
+  return out;
+}
+
+function fmtBoard(r: any, maxSlots = 18): string {
+  const slots = allSlots(r);
+  const lines = [headerOf(r), ...slots.slice(0, maxSlots).map(slotLine)];
+  if (slots.length > maxSlots) lines.push(`　…還有 ${slots.length - maxSlots} 位，完整內容看網站：${SITE}`);
+  return lines.join("\n");
+}
+
+/** 讀取登記：優先用 entries_view（含讚數），失敗退回 entries */
+async function fetchRows(server: string): Promise<any[]> {
+  const q = server ? `&server=eq.${server}` : "";
+  try {
+    const r = await fetch(
+      `${SB_URL}/rest/v1/entries_view?select=*&order=like_count.desc,created_at.desc${q}`,
+      { headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` } },
+    );
+    if (r.ok) {
+      const j = await r.json();
+      if (Array.isArray(j)) return j;
+    }
+  } catch { /* fall through */ }
+  const r2 = await fetch(
+    `${SB_URL}/rest/v1/entries?select=*&order=created_at.desc${q}`,
+    { headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` } },
+  );
+  const j2 = await r2.json();
+  return Array.isArray(j2) ? j2 : [];
 }
 
 Deno.serve(async (req) => {
@@ -67,7 +128,7 @@ Deno.serve(async (req) => {
       });
       const myRows: any[] = await r.json();
       content = Array.isArray(myRows) && myRows.length
-        ? myRows.map(fmtBoard).join("\n\n")
+        ? myRows.map((x) => fmtBoard(x)).join("\n\n")
         : `你還沒有登記助戰板。\n到網站用 Discord 登入後登記：${SITE}`;
       const d: any = { content: content.slice(0, 1900) };
       if (priv) d.flags = 64;
@@ -78,31 +139,28 @@ Deno.serve(async (req) => {
     const q = String(opts.servant || "").trim().toLowerCase();
     const code = String(opts.code || "").replace(/\D/g, "");
     const server = String(opts.server || "");
-    let url = `${SB_URL}/rest/v1/entries?select=server,friend_code,note,boards&order=created_at.desc`;
-    if (server) url += `&server=eq.${server}`;
-    const res = await fetch(url, { headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` } });
-    const rows: any[] = await res.json();
+    const rows = await fetchRows(server);
 
     if (code) {
       const hit = rows.find((rr) => String(rr.friend_code).replace(/\D/g, "") === code);
-      content = hit ? fmtBoard(hit) : `找不到好友編號 ${opts.code}。`;
+      content = hit ? fmtBoard(hit, 30) : `找不到好友編號 ${opts.code}。`;
     } else if (q) {
       const matches: any[] = [];
       for (const rr of rows) {
-        for (const bk of Object.keys(rr.boards || {})) {
-          for (const sk of Object.keys(rr.boards[bk])) {
-            const sl = rr.boards[bk][sk];
-            const names = [sl.servant?.cn, sl.servant?.en, sl.servant?.ja, sl.servant?.tw, sl.servant?.className]
-              .map((x: string) => (x || "").toLowerCase());
-            if (names.some((n) => n.includes(q))) matches.push({ r: rr, sl });
-          }
+        for (const sl of allSlots(rr)) {
+          const names = [sl.servant?.cn, sl.servant?.en, sl.servant?.ja, sl.servant?.tw, sl.servant?.className]
+            .map((x: string) => (x || "").toLowerCase());
+          if (names.some((n) => n.includes(q))) matches.push({ r: rr, sl });
         }
       }
       content = matches.length
-        ? `🔍 含「${opts.servant}」的助戰（${matches.length} 筆${matches.length > 10 ? "，顯示前 10" : ""}）\n\n` +
-          matches.slice(0, 10).map((m) =>
-            `**${m.r.friend_code}**（${SRV[m.r.server] || m.r.server}）— ${sName(m.sl.servant)} NP${m.sl.np}·Lv${m.sl.level || "?"}${m.r.note ? ` · 📝${m.r.note}` : ""}`
-          ).join("\n")
+        ? `🔍 含「${opts.servant}」的助戰（${matches.length} 筆${matches.length > 10 ? "，依讚數顯示前 10" : ""}）\n\n` +
+          matches.slice(0, 10).map((m) => {
+            const st = m.r.is_full ? "🔴滿" : "🟢徵";
+            const lk = m.r.like_count ? ` 👍${m.r.like_count}` : "";
+            const up = m.r.updated_at ? ` 🕒${ago(m.r.updated_at)}` : "";
+            return `${st} **${m.r.friend_code}**（${SRV[m.r.server] || m.r.server}）${lk}${up}\n` + slotLine(m.sl);
+          }).join("\n")
         : `找不到含「${opts.servant}」的助戰。`;
     } else {
       content = "用法：/fgo servant:<從者名> 或 /fgo code:<好友編號>；查自己的用 /fgo_me。";
