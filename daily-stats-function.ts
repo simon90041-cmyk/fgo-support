@@ -15,8 +15,10 @@ const n = (v: unknown) => Number(v ?? 0).toLocaleString("en-US");
 
 Deno.serve(async (req) => {
   try {
-    if (SECRET && req.headers.get("x-hook-secret") !== SECRET) {
-      return new Response("forbidden", { status: 200 });
+    // fail-closed：密鑰沒設定就拒絕，避免變成任何人可打的公開端點
+    if (!SECRET) return new Response("misconfigured", { status: 500 });
+    if (req.headers.get("x-hook-secret") !== SECRET) {
+      return new Response("forbidden", { status: 403 });
     }
     if (!HOOK) return new Response("webhook not configured", { status: 200 });
 
@@ -29,13 +31,33 @@ Deno.serve(async (req) => {
       },
       body: "{}",
     });
+    // 查詢失敗時不要靜默送出一份全 0 報表，改發警示
+    if (!res.ok) {
+      const errTxt = (await res.text()).slice(0, 500);
+      await fetch(HOOK, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          embeds: [{
+            title: "⚠ 每日報表產生失敗",
+            color: 0xd3453b,
+            description: "```\n" + errTxt + "\n```",
+            footer: { text: `daily_stats RPC 回應 ${res.status}` },
+          }],
+        }),
+      }).catch(() => {});
+      return new Response("stats rpc failed", { status: 200 });
+    }
     const s = await res.json();
 
+    // ref/name 皆可被匿名寫入 → 去 markdown 特殊字元、截斷，避免破壞或偽造報表
+    const mdSafe = (v: unknown, len: number) =>
+      String(v ?? "").replace(/[`*_~|>@\\]/g, "").slice(0, len);
     const refs = (s.top_refs ?? []).length
-      ? (s.top_refs as any[]).map((r) => `\`${n(r.n)}\` ${String(r.ref).replace(/^https?:\/\//, "").slice(0, 45)}`).join("\n")
+      ? (s.top_refs as any[]).map((r) => `\`${n(r.n)}\` ${mdSafe(String(r.ref).replace(/^https?:\/\//, ""), 45)}`).join("\n")
       : "（昨日無訪客）";
     const svts = (s.top_servants ?? []).length
-      ? (s.top_servants as any[]).map((x, i) => `${i + 1}. ${x.name}　\`${n(x.n)} 人\``).join("\n")
+      ? (s.top_servants as any[]).map((x, i) => `${i + 1}. ${mdSafe(x.name, 40)}　\`${n(x.n)} 人\``).join("\n")
       : "（尚無資料）";
 
     const fields: any[] = [
@@ -45,11 +67,11 @@ Deno.serve(async (req) => {
       { name: "🔗 流量來源 Top5", value: refs, inline: false },
       { name: "🏆 最多人放的從者", value: svts, inline: false },
     ];
-    if (Number(s.pending_reports ?? 0) > 0) {
-      fields.push({ name: "🚩 待處理檢舉", value: `**${n(s.pending_reports)}** 件未處理`, inline: false });
-    }
+    // 一律顯示：這樣「0 件」和「通知壞掉但其實有 40 件」不會長得一樣
+    const pending = Number(s.pending_reports ?? 0);
+    fields.push({ name: "🚩 待處理檢舉", value: pending > 0 ? `**${n(pending)}** 件未處理` : "無", inline: false });
 
-    await fetch(HOOK, {
+    const hookRes = await fetch(HOOK, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -63,6 +85,7 @@ Deno.serve(async (req) => {
         }],
       }),
     });
+    if (!hookRes.ok) console.error("discord webhook", hookRes.status, (await hookRes.text()).slice(0, 300));
     return new Response("ok");
   } catch (e) {
     console.error("daily-stats", e);

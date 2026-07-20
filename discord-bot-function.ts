@@ -40,21 +40,30 @@ const BOARD_LABEL: Record<string, string> = {
 };
 const GREEN = 0x4caf50, RED = 0xd3453b;
 
-/** 一行從者：稀有度★・名稱・NP/Lv/技能/AS */
+// boards 是使用者可任意寫入的 JSON。名稱可能含 Discord markdown 或超長字串，
+// 會破壞 embed（1024/欄・6000/則上限）或偽造 bot 輸出 → 一律去特殊字元 + 截斷
+const clean = (v: unknown, n = 40) =>
+  String(v ?? "").replace(/[`*_~|>@\\]/g, "").replace(/\s+/g, " ").trim().slice(0, n);
+const safeNum = (v: unknown) => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
+const safeArr = (a: unknown, n = 10) =>
+  (Array.isArray(a) ? a : []).slice(0, n).map((x) => safeNum(x)).join("/");
+
+/** 一行從者：稀有度★・名稱・NP/Lv/技能/AS（全部欄位皆已清洗） */
 function svtLine(sl: any): string {
-  const stars = "★".repeat(sl.servant?.rarity || 0);
-  const np = Number(sl.np) >= 5 ? "**NP5**" : `NP${sl.np}`;
-  const lvNum = Number(sl.level) || 0;
-  const lv = lvNum >= 100 ? `**Lv${lvNum}**` : `Lv${sl.level || "?"}`;
-  const asArr = sl.as || [];
-  const as = asArr.some((x: number) => x > 0) ? ` ｜ AS ${asArr.join("/")}` : "";
+  const stars = "★".repeat(Math.min(5, Math.max(0, safeNum(sl.servant?.rarity))));
+  const npN = safeNum(sl.np);
+  const np = npN >= 5 ? "**NP5**" : `NP${npN > 0 ? npN : "?"}`;
+  const lvNum = safeNum(sl.level);
+  const lv = lvNum >= 100 ? `**Lv${lvNum}**` : `Lv${lvNum > 0 ? lvNum : "?"}`;
+  const asArr = (Array.isArray(sl.as) ? sl.as : []);
+  const as = asArr.some((x: number) => safeNum(x) > 0) ? ` ｜ AS ${safeArr(asArr, 5)}` : "";
   const crown = sl.grand ? "👑 " : "";
   const ces: string[] = [];
-  if (sl.ce) ces.push(`${ceN(sl.ce)}${ceLb(sl.ce.lb)}`);
-  if (sl.ceBond) ces.push(`${ceN(sl.ceBond)}${sl.ceBond.mode === "np50" ? "「初始50NP」" : ""}`);
-  if (sl.ceBonus) ces.push(`${ceN(sl.ceBonus)}`);
+  if (sl.ce) ces.push(`${clean(ceN(sl.ce))}${ceLb(sl.ce.lb)}`);
+  if (sl.ceBond) ces.push(`${clean(ceN(sl.ceBond))}${sl.ceBond.mode === "np50" ? "「初始50NP」" : ""}`);
+  if (sl.ceBonus) ces.push(`${clean(ceN(sl.ceBonus))}`);
   const ceLine = ces.length ? `\n┗ 🎴 ${ces.join(" ／ ")}` : "";
-  return `${crown}\`${stars}\` **${sName(sl.servant)}**\n┣ ${np} ｜ ${lv} ｜ 技 ${(sl.skills || []).join("/")}${as}${ceLine}`;
+  return `${crown}\`${stars}\` **${clean(sName(sl.servant), 60)}**\n┣ ${np} ｜ ${lv} ｜ 技 ${safeArr(sl.skills, 3)}${as}${ceLine}`;
 }
 
 function allSlots(r: any): any[] {
@@ -95,13 +104,13 @@ function entryEmbed(r: any) {
       lines.push(line);
       shown++;
     }
-    fields.push({ name: `▬ ${BOARD_LABEL[bk]}（${g.length}）`, value: lines.join("\n"), inline: false });
+    fields.push({ name: `▬ ${BOARD_LABEL[bk]}（${g.length}）`, value: (lines.join("\n") || "—").slice(0, 1024), inline: false });
     if (fields.length >= 6) break;
   }
   if (!fields.length) fields.push({ name: "　", value: "（尚未登記從者）", inline: false });
 
   return {
-    title: `👤 ${r.friend_code}`,
+    title: `👤 ${safeCode(r.friend_code)}`,
     url: SITE,
     color: r.is_full ? RED : GREEN,
     description: statusLine(r),
@@ -110,21 +119,44 @@ function entryEmbed(r: any) {
   };
 }
 
-/** 搜尋結果 → 單一 embed，每筆一個 field */
+// Discord 上限：欄位值 1024、欄名 256、整則所有 embed 相加 6000。超過整則被 400 退掉。
+const clampVal = (s: string) => (s.length > 1024 ? s.slice(0, 1010) + "…" : s);
+
+/** 搜尋結果 → 單一 embed，每筆一個 field（每欄截斷 + note 清洗） */
 function searchEmbed(kw: string, matches: any[]) {
   const top = matches.slice(0, 8);
   return {
-    title: `🔍 含「${kw}」的助戰`,
+    title: `🔍 含「${clean(kw, 40)}」的助戰`,
     url: SITE,
     color: GREEN,
     description: `找到 **${matches.length}** 筆${matches.length > top.length ? `，依讚數顯示前 ${top.length}` : ""}`,
     fields: top.map((m) => ({
-      name: `${m.r.is_full ? "🔴" : "🟢"} ${m.r.friend_code}　\`${SRV[m.r.server] || m.r.server}\`${m.r.like_count ? `　👍${m.r.like_count}` : ""}`,
-      value: svtLine(m.sl) + (m.r.note ? `\n📝 ${m.r.note}` : ""),
+      name: clampName(`${m.r.is_full ? "🔴" : "🟢"} ${safeCode(m.r.friend_code)}　\`${SRV[m.r.server] || "?"}\`${m.r.like_count ? `　👍${safeNum(m.r.like_count)}` : ""}`),
+      value: clampVal(svtLine(m.sl) + (m.r.note ? `\n📝 ${clean(m.r.note, 60)}` : "")),
       inline: false,
     })),
     footer: { text: "點標題到網站看完整助戰板" },
   };
+}
+const clampName = (s: string) => (s.length > 256 ? s.slice(0, 250) + "…" : s);
+const safeCode = (c: unknown) => String(c ?? "").replace(/[^\d,]/g, "").slice(0, 20) || "?";
+
+// 把多個 embed 塞進 6000 字總預算內，超過就丟掉尾端並附註
+function fitEmbeds(embeds: any[], note = "…內容過長，其餘請看網站"): any[] {
+  const out: any[] = [];
+  let total = 0;
+  for (const e of embeds) {
+    const size = JSON.stringify(e).length;
+    if (total + size > 5500) break;
+    out.push(e);
+    total += size;
+  }
+  if (!out.length && embeds.length) {           // 單一 embed 就爆 → 硬砍 fields
+    const e = { ...embeds[0], fields: (embeds[0].fields || []).slice(0, 3) };
+    e.footer = { text: note };
+    out.push(e);
+  }
+  return out;
 }
 
 /** 讀取登記：優先用 entries_view（含讚數），失敗退回 entries */
@@ -160,9 +192,12 @@ Deno.serve(async (req) => {
   );
   if (!valid) return new Response("invalid signature", { status: 401 });
 
-  const interaction = JSON.parse(body);
+  let interaction: any;
+  try { interaction = JSON.parse(body); }
+  catch { return new Response("bad request", { status: 400 }); }
   if (interaction.type === 1) return Response.json({ type: 1 }); // PING
 
+  try {
   if (interaction.type === 2) {
     const cmd = interaction.data.name;
     const opts: Record<string, any> = {};
@@ -179,7 +214,7 @@ Deno.serve(async (req) => {
       });
       const myRows: any[] = await r.json();
       const d: any = (Array.isArray(myRows) && myRows.length)
-        ? { embeds: myRows.slice(0, 4).map(entryEmbed) }
+        ? { embeds: fitEmbeds(myRows.slice(0, 4).map(entryEmbed)) }
         : { content: `你還沒有登記助戰板。\n到網站用 Discord 登入後登記：${SITE}` };
       if (priv) d.flags = 64;
       return Response.json({ type: 4, data: d });
@@ -194,7 +229,7 @@ Deno.serve(async (req) => {
     let data: any;
     if (code) {
       const hit = rows.find((rr) => String(rr.friend_code).replace(/\D/g, "") === code);
-      data = hit ? { embeds: [entryEmbed(hit)] } : { content: `找不到好友編號 ${opts.code}。` };
+      data = hit ? { embeds: fitEmbeds([entryEmbed(hit)]) } : { content: `找不到好友編號 ${safeCode(opts.code)}。` };
     } else if (q) {
       const matches: any[] = [];
       for (const rr of rows) {
@@ -205,8 +240,8 @@ Deno.serve(async (req) => {
         }
       }
       data = matches.length
-        ? { embeds: [searchEmbed(String(opts.servant), matches)] }
-        : { content: `找不到含「${opts.servant}」的助戰。` };
+        ? { embeds: fitEmbeds([searchEmbed(String(opts.servant), matches)]) }
+        : { content: `找不到含「${clean(opts.servant, 40)}」的助戰。` };
     } else {
       content = "用法：`/fgo servant:<從者名>` 或 `/fgo code:<好友編號>`；查自己的用 `/fgo_me`。";
       data = { content };
@@ -217,4 +252,8 @@ Deno.serve(async (req) => {
   }
 
   return Response.json({ type: 4, data: { content: "？" } });
+  } catch (e) {
+    console.error("interaction error", e);
+    return Response.json({ type: 4, data: { content: "查詢暫時失敗，請稍後再試 🙏", flags: 64 } });
+  }
 });

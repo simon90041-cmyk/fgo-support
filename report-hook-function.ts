@@ -16,9 +16,10 @@ const cut = (v: unknown, n: number) => String(v ?? "-").slice(0, n) || "-";
 Deno.serve(async (req) => {
   // 一律回 200：Database Webhook 失敗會重試，避免無限重送
   try {
-    // 只有帶對密鑰的請求才處理，避免有人找到網址就對你的頻道灌訊息
-    if (SECRET && req.headers.get("x-hook-secret") !== SECRET) {
-      return new Response("forbidden", { status: 200 });
+    // fail-closed：密鑰沒設定就拒絕，不要退化成任何人都能打的公開端點
+    if (!SECRET) return new Response("misconfigured", { status: 500 });
+    if (req.headers.get("x-hook-secret") !== SECRET) {
+      return new Response("forbidden", { status: 403 });
     }
     if (!HOOK) return new Response("webhook not configured", { status: 200 });
 
