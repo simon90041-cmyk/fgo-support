@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
           url: SITE,
           color: 0x5f97f6,
           fields,
-          footer: { text: `累計瀏覽 ${n(s.views_total)} ・ 累計訪客 ${n(s.visitors_total)}` },
+          footer: { text: `近90天瀏覽 ${n(s.views_total)} ・ 訪客 ${n(s.visitors_total)}` },
           timestamp: new Date().toISOString(),
         }],
       }),

@@ -14,7 +14,7 @@ const SRV: Record<string, string> = { JP: "日服", NA: "美服", TW: "台服", 
 const cut = (v: unknown, n: number) => String(v ?? "-").slice(0, n) || "-";
 
 Deno.serve(async (req) => {
-  // 一律回 200：Database Webhook 失敗會重試，避免無限重送
+  // pg_net 是 fire-and-forget、非 2xx 不會重試，所以密鑰錯誤/未設定時回 4xx/5xx 只是留紀錄，不會造成重送風暴
   try {
     // fail-closed：密鑰沒設定就拒絕，不要退化成任何人都能打的公開端點
     if (!SECRET) return new Response("misconfigured", { status: 500 });

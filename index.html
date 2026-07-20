@@ -555,7 +555,7 @@ function draftHasSlots(){return BOARDS.some(b=>Object.keys(boardDraft[b.key]||{}
 /* 正在編輯中：有從者、開著格位編輯器，都算「不要動我」 */
 function draftBusy(){return draftHasSlots()||editingKey!==null||!!edServant;}
 /* 這份草稿是從哪一筆既有登記載入的（null = 全新，尚未對應任何既有資料） */
-let LOADED_FROM=null,DRAFT_DIRTY=false,LAST_SERVER=null;
+let LOADED_FROM=null,DRAFT_DIRTY=false,LAST_SERVER=null,sharedView=false;
 function setUser(session){
   const u=(session&&session.user)?{id:session.user.id,name:displayName(session.user)}:null;
   const idChanged=(u?u.id:null)!==LAST_UID;LAST_UID=u?u.id:null;
@@ -564,7 +564,7 @@ function setUser(session){
      否則正在編輯的 6 塊板會被無聲清空 */
   if(idChanged||!draftBusy())loadMyBoard(true);
   if(!idChanged)return;                 // 純續期：不必重畫整個列表
-  fetchMyLikes().then(()=>showAll());}  // 只渲染一次（原本 showAll 會跑兩次）
+  fetchMyLikes().then(()=>{if(!sharedView)showAll();});}  // 分享連結檢視中就不要用整列表蓋掉
 function renderAuth(){const g=$("regGate");if(g)g.style.display=CURRENT_USER?"none":"block";const el=$("authArea");if(!el)return;
   if(CURRENT_USER){el.innerHTML=`<span class="uname">👤 ${escapeHtml(CURRENT_USER.name)}</span><button class="btn sec sm" id="logoutBtn">${t("logout")}</button>`;
     $("logoutBtn").onclick=async()=>{await sb.auth.signOut();};}
@@ -656,7 +656,8 @@ async function fetchGrandGraphs(){try{
   (j||[]).forEach(g=>{if(g.condSvtLv)GRAND_LV=g.condSvtLv;if(g.condSkillLv)GRAND_SK=g.condSkillLv;
     (g.details||[]).forEach(d=>{if(d.baseClass)GRAND_BY_CLASS[d.baseClass]={name:g.name,en:g.nameShortEnglish,grandClass:d.grandClass};});});
   GRAND_LOADED=Object.keys(GRAND_BY_CLASS).length>0;
-}catch{GRAND_LOADED=false;}}
+}catch{GRAND_LOADED=false;}
+  if(editingKey!==null&&$("grandHint"))syncGrandEligibility();}  // 資料到齊後重驗，修正開啟即勾的破口
 async function loadServants(){try{
   const regions=[["JP","ja"],["NA","en"],["CN","cn"],["TW","tw"]];  // JP 最完整→提供 id/職階/稀有度/立繪
   const [lists,svtMap]=await Promise.all([
@@ -829,8 +830,8 @@ function loadMyBoard(preserveTyped){
   const keepNote=preserveTyped?$("regNote").value.trim():"";
   if(mine){boardDraft=fillDraft(mine.boards);$("friendCode").value=mine.friendCode;$("regNote").value=mine.note||"";regFull=!!mine.full;LOADED_FROM=mine.id;}
   else{boardDraft=emptyDraft();$("friendCode").value="";$("regNote").value="";regFull=false;LOADED_FROM=null;}
-  if(keepCode)$("friendCode").value=keepCode;
-  if(keepNote)$("regNote").value=keepNote;
+  if(keepCode&&!mine)$("friendCode").value=keepCode;   // 既有登記載入時以真實資料為準，不被手打值覆蓋
+  if(keepNote&&!mine)$("regNote").value=keepNote;
   DRAFT_DIRTY=false;LAST_SERVER=srv;
   renderStatusToggle();
   currentBoard="main";editingKey=null;$("editor").classList.remove("open");renderBoardTabs();renderBoardGrid();
@@ -931,12 +932,13 @@ makeEquipSearcher("edCe","edCeSug",s=>{edCE={...pickCE(s),lb:+$("edCeLb").value}
 $("edApply").onclick=()=>{if(!edServant){toast(t("toast_need_servant"));return;}
   const dupRec=draftServantBoards(currentBoard,editingKey).get(edServant.collectionNo);
   if(dupRec&&dupRec.same.length){toast(t("dup_hint")+dupRec.same.join("、"));return;}   // 同組不可重複
+  const gOK=$("edGrand").checked&&GRAND_LOADED&&grandCheck().ok;   // 冠位資料未載到或不合格一律不寫入
   boardDraft[currentBoard][editingKey]={servant:edServant,np:+$("edNp").value.replace("NP",""),level:parseInt($("edLv").value)||null,
     skills:[+$("edSk1").value,+$("edSk2").value,+$("edSk3").value],as:[+$("edAs1").value,+$("edAs2").value,+$("edAs3").value,+$("edAs4").value,+$("edAs5").value],
     ce:edCE?{...edCE,lb:+$("edCeLb").value}:null,
-    grand:!!$("edGrand").checked,
-    ceBond:($("edGrand").checked&&edCeBond)?{...edCeBond,mode:$("edBondMode").value}:null,
-    ceBonus:($("edGrand").checked&&edCeBonus)?{...edCeBonus}:null};
+    grand:gOK,
+    ceBond:(gOK&&edCeBond)?{...edCeBond,mode:$("edBondMode").value}:null,
+    ceBonus:(gOK&&edCeBonus)?{...edCeBonus}:null};
   $("editor").classList.remove("open");editingKey=null;DRAFT_DIRTY=true;renderBoardTabs();renderBoardGrid();toast(t("toast_applied"));};
 $("edClear").onclick=()=>{delete boardDraft[currentBoard][editingKey];$("editor").classList.remove("open");editingKey=null;DRAFT_DIRTY=true;renderBoardTabs();renderBoardGrid();toast(t("toast_cleared"));};
 
@@ -1071,23 +1073,24 @@ function refreshDB(){
    就會灌爆排名。每位玩家對同一項目只計一次。 */
 function rankTally(srv,cls){
   const svt=new Map(),ce=new Map(),combo=new Map();
-  const bump=(m,k,info)=>{const r=m.get(k)||{n:0,...info};r.n++;m.set(k,r);};
+  /* 以 owner 集合去重：同一玩家不論跨板或跨伺服器重複放，同一項目都只計一次 */
+  const bump=(m,k,owner,info)=>{let r=m.get(k);if(!r){r={owners:new Set(),...info};m.set(k,r);}r.owners.add(owner);};
   const rows=load().filter(e=>!srv||e.server===srv);
   rows.forEach(e=>{
-    const s1=new Map(),c1=new Map(),k1=new Map();
+    const o=e.owner;
     slotsOf(e).forEach(sl=>{
       const sv=sl.servant;if(!sv)return;
       if(cls&&!classMatch(sv.className,cls))return;
-      if(sv.collectionNo!=null)s1.set(sv.collectionNo,{face:sv.face,name:servantLabel(sv),sub:"★".repeat(sv.rarity||0)});
+      if(sv.collectionNo!=null)bump(svt,sv.collectionNo,o,{face:sv.face,name:servantLabel(sv),sub:"★".repeat(sv.rarity||0)});
       [sl.ce,sl.ceBond,sl.ceBonus].filter(Boolean).forEach(c=>{
-        if(c.id!=null)c1.set(c.id,{face:c.face,name:ceName(c),sub:"★".repeat(c.rarity||0)});});
+        if(c.id!=null)bump(ce,c.id,o,{face:c.face,name:ceName(c),sub:"★".repeat(c.rarity||0)});});
       if(sv.collectionNo!=null&&sl.ce&&sl.ce.id!=null)
-        k1.set(sv.collectionNo+"|"+sl.ce.id,{face:sv.face,face2:sl.ce.face,name:servantLabel(sv),sub:"🎴 "+ceName(sl.ce)});
+        bump(combo,sv.collectionNo+"|"+sl.ce.id,o,{face:sv.face,face2:sl.ce.face,name:servantLabel(sv),sub:"🎴 "+ceName(sl.ce)});
     });
-    s1.forEach((v,k)=>bump(svt,k,v));c1.forEach((v,k)=>bump(ce,k,v));k1.forEach((v,k)=>bump(combo,k,v));
   });
-  const top=m=>[...m.values()].sort((a,b)=>b.n-a.n).slice(0,10);
-  return {players:rows.length,svt:top(svt),ce:top(ce),combo:top(combo)};}
+  const top=m=>[...m.values()].map(r=>({n:r.owners.size,face:r.face,face2:r.face2,name:r.name,sub:r.sub}))
+                 .sort((a,b)=>b.n-a.n).slice(0,10);
+  return {players:new Set(rows.map(e=>e.owner)).size,svt:top(svt),ce:top(ce),combo:top(combo)};}
 function rankList(items,total){
   if(!items.length)return `<div class="hint" style="padding:8px 0">—</div>`;
   const max=items[0].n||1;
@@ -1256,7 +1259,8 @@ fetchEntries().then(()=>{loading=false;refreshDB();renderStrips();
 function openSharedCode(){
   const raw=new URLSearchParams(location.search).get("code");
   const d=digits(raw||"");
-  if(!d){showAll();return;}
+  if(!d){sharedView=false;showAll();return;}
+  sharedView=true;
   const hit=load().filter(e=>digits(e.friendCode)===d);
   if(!hit.length){lastQueryLabel=raw;renderList([],t("desc_code")+" "+raw);return;}
   $("q1code").value=hit[0].friendCode;   // 讓查詢框同步顯示
