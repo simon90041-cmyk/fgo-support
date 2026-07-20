@@ -71,6 +71,24 @@ Deno.serve(async (req) => {
     const pending = Number(s.pending_reports ?? 0);
     fields.push({ name: "🚩 待處理檢舉", value: pending > 0 ? `**${n(pending)}** 件未處理` : "無", inline: false });
 
+    // 金絲雀監控：把「會靜默出事」的東西變成看得見的警告
+    const warnings: string[] = [];
+    // (a) 接近 PostgREST 預設 1000 筆上限 → 超過會靜默截斷，資料在網站與 bot 都會消失
+    const entries = Number(s.entries ?? 0);
+    if (entries >= 950) warnings.push(`⚠ 登記數 **${n(entries)}**／1000，接近 PostgREST 靜默截斷上限 — 該改分頁或靜態快照了`);
+    else if (entries >= 800) warnings.push(`⚠ 登記數 **${n(entries)}**，開始接近 1000 筆上限，可提前規劃`);
+    // (b) bot_stats 太久沒更新 → 每6小時的 cron 可能死了（pg_net 失敗是靜默的）
+    try {
+      const br = await fetch(`${SB_URL}/rest/v1/bot_stats?id=eq.1&select=updated_at`, {
+        headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` },
+      });
+      const bj = await br.json();
+      const up = Array.isArray(bj) && bj[0]?.updated_at ? new Date(bj[0].updated_at).getTime() : 0;
+      const ageH = up ? (Date.now() - up) / 3.6e6 : Infinity;
+      if (ageH > 12) warnings.push(`⚠ 機器人統計已 **${Number.isFinite(ageH) ? Math.round(ageH) + " 小時" : "從未"}** 未更新 — bot-stats 排程可能已停`);
+    } catch { /* 監控本身失敗不影響報表 */ }
+    if (warnings.length) fields.push({ name: "🛎️ 系統警示", value: warnings.join("\n"), inline: false });
+
     const hookRes = await fetch(HOOK, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

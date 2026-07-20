@@ -509,11 +509,12 @@ const I18N={
   dis1:"本サイトはプレイヤーが自主的にフレンドIDを登録・共有するためのものです。全データは手動入力。サーヴァント／礼装データ：Atlas Academy（api.atlasacademy.io）。",dis2:"TYPE-MOON / Aniplex / DELiGHTWORKS とは無関係です。いかなるプレイヤーのゲームアカウント情報も読み取りません／読み取れません。",dis3:"データはクラウド（Supabase）に保存され、全プレイヤーで共有されます。登録にはDiscordまたはEmailでのログインが必要。アカウントごと・サーバーごとに編成は1つで、自分の登録のみ編集／削除できます。"}
 };
 let LANG=localStorage.getItem("fgo_lang")||"zh-TW";
-function t(k){return (I18N[LANG]&&I18N[LANG][k])||I18N["zh-TW"][k]||k;}
+/* nullish 判斷：合法的空字串翻譯得以保留，缺 key 才 fallback（避免中文洩漏到英日介面） */
+function t(k){const v=I18N[LANG]&&I18N[LANG][k];return v!=null?v:(I18N["zh-TW"][k]!=null?I18N["zh-TW"][k]:k);}
 function applyLang(lang){LANG=lang;localStorage.setItem("fgo_lang",lang);document.documentElement.lang=lang;
   document.querySelectorAll("[data-i18n]").forEach(el=>el.textContent=t(el.dataset.i18n));
   document.querySelectorAll("[data-i18n-ph]").forEach(el=>el.placeholder=t(el.dataset.i18nPh));
-  refreshDB();renderStrips();renderBoardTabs();renderBoardGrid();renderBL();renderBotStat();
+  refreshDB();renderStrips();renderBoardTabs();renderBoardGrid();renderBL();renderBotStat();renderAuth();
   /* 換語言時保留目前的搜尋結果，不要跳回「顯示全部」 */
   if(lastItems&&lastItems.length)renderList(lastItems,lastDesc,true);else showAll();
   if($("grandHint"))syncGrandEligibility();}
@@ -529,8 +530,9 @@ function toast(m){const el=$("toast");el.textContent=m;el.classList.add("show");
 let ENTRIES=[],MYLIKES=new Set();
 function load(){return ENTRIES;}
 async function fetchEntries(){try{
-  let r=await sb.from("entries_view").select("*").order("like_count",{ascending:false}).order("created_at",{ascending:false});
-  if(r.error){ r=await sb.from("entries").select("*").order("created_at",{ascending:false}); if(r.error)throw r.error; }
+  /* limit 保險：資料若暴增，寧可載入前 500 筆也不要把上 MB 塞給手機；接近時再改靜態快照架構 */
+  let r=await sb.from("entries_view").select("*").order("like_count",{ascending:false}).order("created_at",{ascending:false}).limit(500);
+  if(r.error){ r=await sb.from("entries").select("*").order("created_at",{ascending:false}).limit(500); if(r.error)throw r.error; }
   ENTRIES=(r.data||[]).map(x=>({id:x.id,owner:x.owner,server:x.server,friendCode:x.friend_code,note:x.note||"",boards:x.boards||{},likes:x.like_count||0,full:!!x.is_full,createdAt:x.created_at,updatedAt:x.updated_at||x.created_at}));
   await fetchMyLikes();
 }catch(e){console.error("fetch",e);toast(t("err_load"));}}
@@ -661,7 +663,9 @@ async function fetchGrandGraphs(){try{
   GRAND_LOADED=Object.keys(GRAND_BY_CLASS).length>0;
 }catch{GRAND_LOADED=false;}
   if(editingKey!==null&&$("grandHint"))syncGrandEligibility();}  // 資料到齊後重驗，修正開啟即勾的破口
-async function loadServants(){try{
+let servantsP=null;
+function loadServants(){return servantsP||(servantsP=fetchServants());}  // memoize：只抓一次
+async function fetchServants(){try{
   const regions=[["JP","ja"],["NA","en"],["CN","cn"],["TW","tw"]];  // JP 最完整→提供 id/職階/稀有度/立繪
   const [lists,svtMap]=await Promise.all([
     Promise.all(regions.map(([r])=>fetch(`https://api.atlasacademy.io/export/${r}/basic_servant.json`).then(x=>x.json()).catch(()=>[]))),  // 單一語區掛掉不該讓整份從者清單變空
@@ -707,7 +711,8 @@ function makeServantSearcher(inputId,sugId,onPick,getCls,getDup){
       sug.appendChild(d);});}
   function run(){const q=input.value.trim();const cls=getCls?getCls():null;render(q?searchServants(q,cls):browseServants(cls));}
   input.addEventListener("input",()=>{clearTimeout(timer);timer=setTimeout(run,150);});
-  input.addEventListener("focus",run);
+  /* 首次聚焦從者搜尋框才載入從者索引（~1.86MB）；純瀏覽好友碼的訪客完全不用付這個成本 */
+  input.addEventListener("focus",()=>{loadServants().then(run);run();});
 }
 /* 支援欄分兩組：常駐組（主要＋額外Ⅰ/Ⅱ）與活動組（活動Ⅰ/Ⅱ/Ⅲ）。
    同一組內不可重複從者；跨組可以重複（常駐放術傻、活動也放術傻是合法的）。 */
@@ -1268,7 +1273,7 @@ $("lang").value=LANG;$("lang").onchange=e=>applyLang(e.target.value);
     ref:(document.referrer||"").slice(0,300)||null,
     lang:LANG,sess:s}).then(()=>{},()=>{});
 }catch(e){}})();
-loadServants();applyLang(LANG);renderBL();initAuth();loadBotStat();
+applyLang(LANG);renderBL();initAuth();loadBotStat();   // 從者索引改為聚焦搜尋框時才載入
 fetchEntries().then(()=>{loading=false;refreshDB();renderStrips();
   openSharedCode();                      // 有 ?code= 就直接開那筆，否則顯示全部
   if(!draftBusy())loadMyBoard(true);});
