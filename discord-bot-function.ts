@@ -7,6 +7,34 @@ const SB_URL = Deno.env.get("SUPABASE_URL")!;
 const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SB_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SITE = "https://simon90041-cmyk.github.io/fgo-support/";
+// 一鍵腳本的存放位置（GitHub Pages 直接把 .sh 當純文字送出即可）。
+// 換自訂網域時只改這裡；務必是可被玩家先下載檢視的靜態檔。
+const SCRIPT_BASE = "https://simon90041-cmyk.github.io/fgo-support";
+
+// /bind 用：6 碼驗證碼（排除易混淆字元）+ 不可猜 token，皆用密碼學安全亂數
+function randPick(alphabet: string, n: number): string {
+  const buf = new Uint8Array(n);
+  crypto.getRandomValues(buf);
+  let out = "";
+  for (let i = 0; i < n; i++) out += alphabet[buf[i] % alphabet.length];
+  return out;
+}
+const genCode = () => randPick("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 6);
+function genToken(): string {
+  const b = new Uint8Array(18);
+  crypto.getRandomValues(b);
+  return Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+}
+// service_role 呼叫 RPC
+async function svcRpc(fn: string, args: Record<string, unknown>): Promise<any> {
+  const r = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, {
+    method: "POST",
+    headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, "Content-Type": "application/json" },
+    body: JSON.stringify(args),
+  });
+  return r.ok ? r.json() : null;
+}
+const eph = (content: string) => Response.json({ type: 4, data: { content, flags: 64 } });
 
 function hex2bytes(hex: string): Uint8Array {
   const b = new Uint8Array(hex.length / 2);
@@ -218,6 +246,64 @@ Deno.serve(async (req) => {
         : { content: `你還沒有登記助戰板。\n到網站用 Discord 登入後登記：${SITE}` };
       if (priv) d.flags = 64;
       return Response.json({ type: 4, data: d });
+    }
+
+    const discordId = interaction.member?.user?.id || interaction.user?.id;
+
+    // /fgo_bind：直接登記好友編號（免驗證）。助戰由後端自動同步。
+    if (cmd === "fgo_bind") {
+      const bserver = String(opts.server || "").toUpperCase();
+      const bcode = String(opts.code || "").replace(/\D/g, "");
+      if (!SRV[bserver]) return eph("請選擇伺服器（JP／NA／TW／CN）。");
+      if (bcode.length < 6) return eph("請輸入正確的好友編號（純數字）。");
+      const res = await svcRpc("bot_register_code", {
+        p_discord_id: discordId, p_server: bserver, p_friend_code: bcode,
+      });
+      if (!res?.ok) {
+        if (res?.reason === "needs_login")
+          return eph(`登記前請先用 **Discord 登入網站一次**（建立你的帳號）：\n${SITE}\n登入後再回來執行 /fgo_bind。`);
+        if (res?.reason === "code_taken")
+          return eph("這個好友編號已被登記於同伺服器。若是你的，請到網站檢舉處理。");
+        return eph("登記失敗，請稍後再試 🙏");
+      }
+      return eph(
+        `✅ **已登記 ${SRV[bserver]}｜${safeCode(bcode)}**\n` +
+        "你的助戰會**自動同步**（通常隔天更新），不用再做任何事。\n" +
+        `到網站查看：${SITE}\n有問題可在網站檢舉。`,
+      );
+    }
+
+    // /fgo_update：現在全自動，不需玩家操作
+    if (cmd === "fgo_update") {
+      return eph(
+        "🔄 **助戰是自動同步的**，你不用做任何事——登記後系統會定期自動更新你的助戰板。\n" +
+        `查看：${SITE}`,
+      );
+    }
+
+    // /fgo_profile：顯示綁定狀態與各伺服器登記
+    if (cmd === "fgo_profile") {
+      const p = await svcRpc("bot_profile", { p_discord_id: discordId });
+      if (!p?.ok) return eph(p?.reason === "needs_login"
+        ? `你還沒用 Discord 登入過網站。先到 ${SITE} 登入即完成綁定。`
+        : "查詢失敗，請稍後再試 🙏");
+      const entries: any[] = Array.isArray(p.entries) ? p.entries : [];
+      if (!entries.length) return eph(`你已登入網站但尚未登記助戰板。到 ${SITE} 或用 /fgo_bind 登記。`);
+      const lines = entries.map((e) =>
+        `\`${SRV[e.server] || e.server}\`　${safeCode(e.friend_code)}　${e.is_full ? "🔴已滿" : "🟢徵求"}　${safeNum(e.slots)} 位　🕒${ago(e.updated_at)}`);
+      const bound = Array.isArray(p.devices) && p.devices.length
+        ? `\n📱 已綁定腳本：${p.devices.map((s: string) => SRV[s] || s).join("、")}` : "";
+      return eph(`👤 **你的登記**\n${lines.join("\n")}${bound}`);
+    }
+
+    // /fgo_unbind：解除某伺服器的綁定 + 刪除該登記
+    if (cmd === "fgo_unbind") {
+      const userver = String(opts.server || "").toUpperCase();
+      if (!SRV[userver]) return eph("請選擇要解除綁定的伺服器（JP／NA／TW／CN）。");
+      const r = await svcRpc("bot_unbind", { p_discord_id: discordId, p_server: userver });
+      if (!r?.ok) return eph(r?.reason === "needs_login"
+        ? "查無你的帳號，可能未曾登入網站。" : "解除失敗，請稍後再試 🙏");
+      return eph(r.deleted ? `已解除 ${SRV[userver]} 的綁定並刪除該登記。` : `${SRV[userver]} 沒有可解除的登記。`);
     }
 
     // /fgo （搜尋）
