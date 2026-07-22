@@ -543,7 +543,7 @@ async function fetchEntries(){try{
   /* limit 保險：資料若暴增，寧可載入前 500 筆也不要把上 MB 塞給手機；接近時再改靜態快照架構 */
   let r=await sb.from("entries_view").select("*").order("like_count",{ascending:false}).order("created_at",{ascending:false}).limit(500);
   if(r.error){ r=await sb.from("entries").select("*").order("created_at",{ascending:false}).limit(500); if(r.error)throw r.error; }
-  ENTRIES=(r.data||[]).map(x=>({id:x.id,owner:x.owner,server:x.server,friendCode:x.friend_code,note:x.note||"",boards:x.boards||{},likes:x.like_count||0,full:!!x.is_full,createdAt:x.created_at,updatedAt:x.updated_at||x.created_at}));
+  ENTRIES=(r.data||[]).map(x=>({id:x.id,owner:x.owner,server:safeSrv(x.server),friendCode:x.friend_code,note:x.note||"",boards:x.boards||{},likes:x.like_count||0,full:!!x.is_full,createdAt:x.created_at,updatedAt:x.updated_at||x.created_at}));
   await fetchMyLikes();
 }catch(e){console.error("fetch",e);toast(t("err_load"));}}
 async function fetchMyLikes(){MYLIKES=new Set();if(!CURRENT_USER)return;try{const {data}=await sb.from("likes").select("entry_id");(data||[]).forEach(x=>MYLIKES.add(x.entry_id));}catch{}}
@@ -620,7 +620,14 @@ function shareEntry(code){const url=shareUrl(code);
 function safeUrl(u){u=String(u==null?"":u);return /^https:\/\/static\.atlasacademy\.io\//.test(u)?u:"";}
 function fmtCode(el){el.addEventListener("input",()=>{el.value=el.value.replace(/\D/g,"").slice(0,12);});}
 function validCode(c){const d=(c||"").replace(/\D/g,"");return d.length>=9&&d.length<=12;}
-function srvName(code){return t("srv_"+String(code).toLowerCase());}
+/* server 只可能是這四個；DB 若被塞入其他值，一律正規化成 "?"，
+   避免未跳脫的 badge / inline onclick 變成 stored XSS 的注入點 */
+const SRV_OK=["JP","NA","TW","CN"];
+function safeSrv(s){return SRV_OK.includes(s)?s:"?";}
+/* 查不到就回 "?"，絕不把傳入值原樣吐回 HTML */
+function srvName(code){const k="srv_"+String(code).toLowerCase();
+  const v=(I18N[LANG]&&I18N[LANG][k])!=null?I18N[LANG][k]:I18N["zh-TW"][k];
+  return v!=null?v:"?";}
 
 const BASE7=["saber","archer","lancer","rider","caster","assassin","berserker"];
 /* 助戰板每塊的 9 職階格 */
@@ -715,7 +722,7 @@ function makeServantSearcher(inputId,sugId,onPick,getCls,getDup){
       d.className="sug-item"+(blocked?" dup":"");
       const tag=blocked?`<span class="dup-tag blocked">${t("dup_hint")}${escapeHtml(rec.same.join("、"))}</span>`
         :(noteOther?`<span class="dup-tag">${t("dup_note")}${escapeHtml(noteOther.join("、"))}</span>`:"");
-      d.innerHTML=`<img src="${s.face}" loading="lazy" onerror="this.style.visibility='hidden'"><div><div>${escapeHtml(servantLabel(s))}${tag}</div><div class="meta">${"★".repeat(s.rarity)} · ${escapeHtml(s.className)} · No.${s.collectionNo}</div></div>`;
+      d.innerHTML=`<img src="${safeUrl(s.face)}" loading="lazy" onerror="this.style.visibility='hidden'"><div><div>${escapeHtml(servantLabel(s))}${tag}</div><div class="meta">${"★".repeat(s.rarity)} · ${escapeHtml(s.className)} · No.${escapeHtml(s.collectionNo)}</div></div>`;
       if(blocked)d.onclick=()=>toast(t("dup_hint")+rec.same.join("、"));
       else d.onclick=()=>{sug.style.display="none";input.value="";onPick(s);};
       sug.appendChild(d);});}
@@ -817,7 +824,7 @@ function makeEquipSearcher(inputId,sugId,onPick,listFn){
   const quick=()=>(listFn?listFn():COMMON_CE)||[];
   function renderCe(arr){if(!arr.length){sug.innerHTML='<div class="sug-item">—</div>';sug.style.display="block";return;}
     sug.innerHTML="";sug.style.display="block";arr.forEach(s=>{const d=document.createElement("div");d.className="sug-item";
-      d.innerHTML=`<img src="${s.face}" loading="lazy" onerror="this.style.visibility='hidden'"><div><div>${ceName(s)}</div><div class="meta">${"★".repeat(s.rarity||0)}</div></div>`;
+      d.innerHTML=`<img src="${safeUrl(s.face)}" loading="lazy" onerror="this.style.visibility='hidden'"><div><div>${escapeHtml(ceName(s))}</div><div class="meta">${"★".repeat(s.rarity||0)}</div></div>`;
       d.onclick=()=>{sug.style.display="none";input.value="";onPick(s);};sug.appendChild(d);});}
   input.addEventListener("input",()=>{const q=input.value.trim();clearTimeout(timer);
     if(!q){renderCe(quick());return;}
@@ -1007,9 +1014,9 @@ $("q1btn").onclick=()=>{const code=$("q1code").value.trim();if(!validCode(code))
   lastQueryLabel=code;
   const d=digits(code);renderList(load().filter(e=>digits(e.friendCode)===d),t("desc_code")+" "+code);};   // 比對數字，逗號格式不同也找得到
 let q2Servant=null,q3Servant=null,q3CE=null;
-makeServantSearcher("q2search","q2sug",s=>{q2Servant=pickServant(s);$("q2picked").innerHTML=`<div class="picked" title="${t("click_to_change")}" onclick="event.stopPropagation();reopenPick('q2search')"><img src="${s.face}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700;color:var(--gold2)">${servantLabel(s)}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(s.rarity)} · ${s.className}</div></div><span class="x" onclick="event.stopPropagation();q2Servant=null;document.getElementById('q2picked').innerHTML=''">✕</span></div>`;});
-makeServantSearcher("q3search","q3sug",s=>{q3Servant=pickServant(s);$("q3picked").innerHTML=`<div class="picked" title="${t("click_to_change")}" onclick="event.stopPropagation();reopenPick('q3search')"><img src="${s.face}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700;color:var(--gold2)">${servantLabel(s)}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(s.rarity)} · ${s.className}</div></div><span class="x" onclick="event.stopPropagation();q3Servant=null;document.getElementById('q3picked').innerHTML=''">✕</span></div>`;},()=>$("q3class").value);
-makeEquipSearcher("q3ce","q3ceSug",s=>{q3CE=pickCE(s);$("q3cePicked").innerHTML=`<div class="picked ce" title="${t("click_to_change")}" onclick="event.stopPropagation();reopenPick('q3ce')"><img src="${s.face}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700">${ceName(s)}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(s.rarity||0)}</div></div><span class="x" onclick="event.stopPropagation();q3CE=null;document.getElementById('q3cePicked').innerHTML=''">✕</span></div>`;});
+makeServantSearcher("q2search","q2sug",s=>{q2Servant=pickServant(s);$("q2picked").innerHTML=`<div class="picked" title="${t("click_to_change")}" onclick="event.stopPropagation();reopenPick('q2search')"><img src="${safeUrl(s.face)}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700;color:var(--gold2)">${escapeHtml(servantLabel(s))}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(s.rarity)} · ${escapeHtml(s.className)}</div></div><span class="x" onclick="event.stopPropagation();q2Servant=null;document.getElementById('q2picked').innerHTML=''">✕</span></div>`;});
+makeServantSearcher("q3search","q3sug",s=>{q3Servant=pickServant(s);$("q3picked").innerHTML=`<div class="picked" title="${t("click_to_change")}" onclick="event.stopPropagation();reopenPick('q3search')"><img src="${safeUrl(s.face)}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700;color:var(--gold2)">${escapeHtml(servantLabel(s))}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(s.rarity)} · ${escapeHtml(s.className)}</div></div><span class="x" onclick="event.stopPropagation();q3Servant=null;document.getElementById('q3picked').innerHTML=''">✕</span></div>`;},()=>$("q3class").value);
+makeEquipSearcher("q3ce","q3ceSug",s=>{q3CE=pickCE(s);$("q3cePicked").innerHTML=`<div class="picked ce" title="${t("click_to_change")}" onclick="event.stopPropagation();reopenPick('q3ce')"><img src="${safeUrl(s.face)}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700">${escapeHtml(ceName(s))}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(s.rarity||0)}</div></div><span class="x" onclick="event.stopPropagation();q3CE=null;document.getElementById('q3cePicked').innerHTML=''">✕</span></div>`;});
 $("q2btn").onclick=()=>{if(!q2Servant){toast(t("toast_need_servant"));return;}const minNp=+$("q2np").value,srv=$("q2srv").value;
   let res=load().filter(e=>slotsOf(e).some(sl=>sl.servant.id===q2Servant.id&&sl.np>=minNp));if(srv)res=res.filter(e=>e.server===srv);
   activeClass.clear();activeRar.clear();activeSrv.clear();activeBoard.clear();renderStrips();

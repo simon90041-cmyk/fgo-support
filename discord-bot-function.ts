@@ -275,13 +275,31 @@ Deno.serve(async (req) => {
       );
     }
 
-    // /fgo_update：現在全自動，不需玩家操作
+    // /fgo_update：立即更新自己的台服助戰（排入優先佇列，worker 幾分鐘內處理）。
+    // 冷卻由 bot_request_sync 內部把關（預設 30 分鐘），避免有人狂點洗佇列。
     if (cmd === "fgo_update") {
-      return eph(
-        "🔄 **台服助戰為自動同步**，登記後系統會定期自動更新，免手動。\n" +
-        "其他伺服器（日／美／國）請到網站手動維護助戰板。\n" +
-        `查看：${SITE}`,
-      );
+      const r = await svcRpc("bot_request_sync", { p_discord_id: discordId, p_server: "TW" });
+      if (r?.ok) {
+        return eph(
+          `🔄 **已排入立即更新**（台服｜${safeCode(String(r.friend_code || ""))}）\n` +
+          "系統會在幾分鐘內抓取你最新的助戰並更新到網站。\n" +
+          `查看：${SITE}`,
+        );
+      }
+      if (r?.reason === "cooldown") {
+        const mins = Math.max(1, Math.ceil((Number(r.retry_after) || 60) / 60));
+        return eph(
+          `⏳ **冷卻中**，請再等約 **${mins} 分鐘** 後再試。\n` +
+          "（台服助戰本來就會每天自動同步，不手動更新也沒關係）",
+        );
+      }
+      if (r?.reason === "needs_login")
+        return eph(`請先用 **Discord 登入網站一次**（建立你的帳號）：\n${SITE}`);
+      if (r?.reason === "no_entry")
+        return eph("你在台服還沒有登記。先用 `/fgo_bind server:TW code:<好友編號>` 登記。");
+      if (r?.reason === "manual_server")
+        return eph("目前只有**台服**支援自動匯入；其他伺服器請到網站手動維護助戰板。");
+      return eph("更新請求失敗，請稍後再試 🙏");
     }
 
     // /fgo_profile：顯示綁定狀態與各伺服器登記
