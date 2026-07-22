@@ -525,8 +525,8 @@ function applyLang(lang){LANG=lang;localStorage.setItem("fgo_lang",lang);documen
   document.querySelectorAll("[data-i18n]").forEach(el=>el.textContent=t(el.dataset.i18n));
   document.querySelectorAll("[data-i18n-ph]").forEach(el=>el.placeholder=t(el.dataset.i18nPh));
   refreshDB();renderStrips();renderBoardTabs();renderBoardGrid();renderBL();renderBotStat();renderAuth();updateServerNote();
-  /* 換語言時保留目前的搜尋結果，不要跳回「顯示全部」 */
-  if(lastItems&&lastItems.length)renderList(lastItems,lastDesc,true);else showAll();
+  /* 換語言時保留目前的檢視與頁碼，不要跳回「顯示全部」；初次載入(loading)時交給 openSharedCode 首畫 */
+  if(!loading)rerenderKeepPage();
   if($("grandHint"))syncGrandEligibility();}
 
 /* ================= 共用 ================= */
@@ -537,27 +537,37 @@ const SB_KEY="sb_publishable_3riOk5fynZmI4CC_mbu89Q_06KwNCDq";
 const sb=window.supabase.createClient(SB_URL,SB_KEY);
 const $=id=>document.getElementById(id);
 function toast(m){const el=$("toast");el.textContent=m;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),1800);}
-let ENTRIES=[],MYLIKES=new Set();
-function load(){return ENTRIES;}
-async function fetchEntries(){try{
-  /* limit 保險：資料若暴增，寧可載入前 500 筆也不要把上 MB 塞給手機；接近時再改靜態快照架構 */
-  let r=await sb.from("entries_view").select("*").order("like_count",{ascending:false}).order("created_at",{ascending:false}).limit(500);
-  if(r.error){ r=await sb.from("entries").select("*").order("created_at",{ascending:false}).limit(500); if(r.error)throw r.error; }
-  ENTRIES=(r.data||[]).map(x=>({id:x.id,owner:x.owner,server:safeSrv(x.server),friendCode:x.friend_code,note:x.note||"",boards:x.boards||{},likes:x.like_count||0,full:!!x.is_full,createdAt:x.created_at,updatedAt:x.updated_at||x.created_at}));
-  await fetchMyLikes();
-}catch(e){console.error("fetch",e);toast(t("err_load"));}}
+let MYLIKES=new Set(), MINE=[];
+async function rpc(fn,params){const {data,error}=await sb.rpc(fn,params||{});if(error)throw error;return data;}
+/* 後端卡片（fgo_card）→ 前端物件。刻意不含 boards：列表只用預覽，展開時才單筆取 boards，
+   傳輸量因此砍掉九成。是不是本人也由後端 is_mine（auth.uid()）決定，前端不再看得到 owner。 */
+function normCard(c){return{
+  id:c.id, server:safeSrv(c.server), friendCode:c.friend_code||"", note:c.note||"",
+  full:!!c.is_full, likes:c.likes||0, isMine:!!c.is_mine,
+  createdAt:c.created_at, updatedAt:c.updated_at||c.created_at,
+  slotCount:c.slots||0, grand:!!c.grand,
+  preview:Array.isArray(c.preview)?c.preview.map(p=>({face:p.face,slotKey:p.slot_key,
+    servant:{ja:p.ja,en:p.en,cn:p.cn,tw:p.tw,face:p.face}})):[]};}
 async function fetchMyLikes(){MYLIKES=new Set();if(!CURRENT_USER)return;try{const {data}=await sb.from("likes").select("entry_id");(data||[]).forEach(x=>MYLIKES.add(x.entry_id));}catch{}}
+/* 本人在各伺服器的既有登記（含 boards）——只有自己這幾筆需要完整 boards，供編輯與覆蓋判斷 */
+async function fetchMine(){MINE=[];if(!CURRENT_USER)return;try{
+  const {data}=await sb.from("entries").select("*").eq("owner",CURRENT_USER.id);
+  MINE=(data||[]).map(x=>({id:x.id,server:safeSrv(x.server),friendCode:x.friend_code||"",note:x.note||"",boards:x.boards||{},full:!!x.is_full,createdAt:x.created_at,updatedAt:x.updated_at||x.created_at}));
+}catch(e){console.error("mine",e);}}
+/* 頁首統計改由後端一次算好（玩家數 · 助戰從者總數），前端不再需要整包 entries */
+async function fetchStats(){try{const s=await rpc("fgo_stats");
+  $("dbCount").innerHTML=t("stat_line").replace("{p}",s.players||0).replace("{s}",s.servants||0);}catch(e){console.error("stats",e);}}
 async function likeEntry(id){
   if(!CURRENT_USER){toast(t("need_login"));return;}
   const liked=MYLIKES.has(id);
   const {error}=liked?await sb.from("likes").delete().eq("entry_id",id):await sb.from("likes").insert({entry_id:id});
   if(error){console.error(error);toast(t("err_action"));return;}
   if(liked)MYLIKES.delete(id);else MYLIKES.add(id);
-  const e=ENTRIES.find(x=>x.id===id);if(e)e.likes=Math.max(0,(e.likes||0)+(liked?-1:1));
+  const e=lastCards.find(x=>x.id===id);if(e)e.likes=Math.max(0,(e.likes||0)+(liked?-1:1));
   /* 只改那顆按鈕，不重畫整個列表 —— 展開中的助戰板才不會被收合 */
   const btn=document.querySelector(`#list .like-btn[data-id="${id}"]`);
   if(btn){btn.querySelector("span").textContent=e?e.likes:0;btn.classList.toggle("liked",!liked);}
-  else renderList(lastItems,lastDesc,true);
+  else paint(true);
 }
 /* ---- 登入（Discord via Supabase Auth）---- */
 let CURRENT_USER=null;
@@ -577,8 +587,9 @@ function setUser(session){
   CURRENT_USER=u;renderAuth();refreshDB();
   /* Supabase 每小時 TOKEN_REFRESHED 也會觸發這裡；只有真的換人登入才重載板子，
      否則正在編輯的 6 塊板會被無聲清空 */
-  if(idChanged||!draftBusy())loadMyBoard(true);
-  if(!idChanged)return;                 // 純續期：不必重畫整個列表
+  if(!idChanged){if(!draftBusy())loadMyBoard(true);return;}   // 純續期：不重載本人資料/列表
+  /* 真的換人（登入/登出）：先載本人既有登記，再據以載入編輯板；並重載列表以更新 is_mine */
+  fetchMine().then(()=>loadMyBoard(true));
   fetchMyLikes().then(()=>{if(!sharedView)showAll();});}  // 分享連結檢視中就不要用整列表蓋掉
 function renderAuth(){const g=$("regGate");if(g)g.style.display=CURRENT_USER?"none":"block";const el=$("authArea");if(!el)return;
   if(CURRENT_USER){el.innerHTML=`<span class="uname">👤 ${escapeHtml(CURRENT_USER.name)}</span><button class="btn sec sm" id="logoutBtn">${t("logout")}</button>`;
@@ -859,7 +870,7 @@ function fillDraft(boards){const d=emptyDraft();Object.keys(boards||{}).forEach(
 /* 一個帳號每個伺服器只有一組板：載入本人在目前伺服器的既有板來編輯（沒有就清空） */
 function loadMyBoard(preserveTyped){
   const srv=$("server").value;
-  const mine=CURRENT_USER?ENTRIES.find(e=>e.owner===CURRENT_USER.id&&e.server===srv):null;
+  const mine=CURRENT_USER?MINE.find(e=>e.server===srv):null;
   /* 資料還在路上時使用者可能已經先打了字，載入既有板時不要把它蓋掉 */
   const keepCode=preserveTyped?$("friendCode").value.trim():"";
   const keepNote=preserveTyped?$("regNote").value.trim():"";
@@ -989,16 +1000,16 @@ $("server").addEventListener("change",function(){
   if(DRAFT_DIRTY&&draftHasSlots()&&!confirm(t("confirm_switch_srv"))){this.value=LAST_SERVER;return;}
   loadMyBoard();updateServerNote();});
 document.querySelectorAll("#statusToggle .st-btn").forEach(b=>b.onclick=()=>{regFull=b.dataset.v==="1";renderStatusToggle();});
-$("recruitFilter").onclick=()=>{onlyRecruiting=!onlyRecruiting;$("recruitFilter").classList.toggle("active",onlyRecruiting);renderList(lastItems,lastDesc);};
-$("grandFilter").onclick=()=>{onlyGrand=!onlyGrand;$("grandFilter").classList.toggle("active",onlyGrand);renderList(lastItems,lastDesc);};
-$("sortSel").onchange=e=>{SORT=e.target.value;renderList(lastItems,lastDesc);};
+$("recruitFilter").onclick=()=>{onlyRecruiting=!onlyRecruiting;$("recruitFilter").classList.toggle("active",onlyRecruiting);rerender();};
+$("grandFilter").onclick=()=>{onlyGrand=!onlyGrand;$("grandFilter").classList.toggle("active",onlyGrand);rerender();};
+$("sortSel").onchange=e=>{SORT=e.target.value;rerender();};
 function updateServerNote(){const el=$("serverNote");if(!el)return;const tw=$("server").value==="TW";el.textContent=t(tw?"note_auto_tw":"note_manual");el.style.color=tw?"#4caf50":"#e0a030";}
 $("saveBtn").onclick=async()=>{
   if(!CURRENT_USER){toast(t("need_login"));return;}
   const code=$("friendCode").value.replace(/\D/g,"");   /* 只存數字，不加逗號 */
   if(!validCode(code)){toast(t("toast_need_code"));return;}
   const boards={};let total=0;BOARDS.forEach(b=>{const bd=boardDraft[b.key];if(bd&&Object.keys(bd).length){boards[b.key]=JSON.parse(JSON.stringify(bd));total+=Object.keys(bd).length;}});
-  const prev=CURRENT_USER?ENTRIES.find(e=>e.owner===CURRENT_USER.id&&e.server===$("server").value):null;
+  const prev=CURRENT_USER?MINE.find(e=>e.server===$("server").value):null;
   /* 非台服：目前無自動匯入，維持必填助戰板 */
   if(!total&&$("server").value!=="TW"){toast(t("toast_manual_only"));return;}
   /* 手動模式（有填助戰）才做覆蓋確認，避免蓋掉既有 */
@@ -1013,7 +1024,7 @@ $("saveBtn").onclick=async()=>{
   if(error){console.error(error);
     /* 23505 = 唯一性衝突：同伺服器已有人登記這個好友編號 */
     toast(error.code==="23505"?t("err_code_taken"):t("err_save")+error.message);return;}
-  toast(total?t("toast_saved"):t("toast_registered"));await fetchEntries();refreshDB();showAll();loadMyBoard();};
+  toast(total?t("toast_saved"):t("toast_registered"));await fetchMine();refreshDB();showAll();loadMyBoard();};
 
 /* ================= 搜尋 ================= */
 function slotsOf(entry){const out=[];const boards=entry.boards||{};
@@ -1025,41 +1036,40 @@ function slotsOf(entry){const out=[];const boards=entry.boards||{};
         boardKey:b.key,boardCat:b.cat,boardLabel:boardLabelOf(b),slotKey:sl.key,slotLabel:slotLabelOf(sl)});});});
   return out;}
 fmtCode($("q1code"));
-$("q1btn").onclick=()=>{const code=$("q1code").value.trim();if(!validCode(code)){toast(t("toast_need_code"));return;}activeClass.clear();activeRar.clear();activeSrv.clear();activeBoard.clear();renderStrips();
-  lastQueryLabel=code;
-  const d=digits(code);renderList(load().filter(e=>digits(e.friendCode)===d),t("desc_code")+" "+code);};   // 比對數字，逗號格式不同也找得到
+$("q1btn").onclick=async()=>{const code=$("q1code").value.trim();if(!validCode(code)){toast(t("toast_need_code"));return;}clearChips();
+  lastQueryLabel=code;MODE="search";lastDesc=t("desc_code")+" "+code;
+  try{lastCards=(await rpc("fgo_by_code",{p_code:digits(code)})).map(normCard);}   // 後端比對數字，逗號格式不同也找得到
+  catch(e){console.error(e);lastCards=[];toast(t("err_load"));}
+  paint(false);};
 let q2Servant=null,q3Servant=null,q3CE=null;
 makeServantSearcher("q2search","q2sug",s=>{q2Servant=pickServant(s);$("q2picked").innerHTML=`<div class="picked" title="${t("click_to_change")}" onclick="event.stopPropagation();reopenPick('q2search')"><img src="${safeUrl(s.face)}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700;color:var(--gold2)">${escapeHtml(servantLabel(s))}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(s.rarity)} · ${escapeHtml(s.className)}</div></div><span class="x" onclick="event.stopPropagation();q2Servant=null;document.getElementById('q2picked').innerHTML=''">✕</span></div>`;});
 makeServantSearcher("q3search","q3sug",s=>{q3Servant=pickServant(s);$("q3picked").innerHTML=`<div class="picked" title="${t("click_to_change")}" onclick="event.stopPropagation();reopenPick('q3search')"><img src="${safeUrl(s.face)}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700;color:var(--gold2)">${escapeHtml(servantLabel(s))}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(s.rarity)} · ${escapeHtml(s.className)}</div></div><span class="x" onclick="event.stopPropagation();q3Servant=null;document.getElementById('q3picked').innerHTML=''">✕</span></div>`;},()=>$("q3class").value);
 makeEquipSearcher("q3ce","q3ceSug",s=>{q3CE=pickCE(s);$("q3cePicked").innerHTML=`<div class="picked ce" title="${t("click_to_change")}" onclick="event.stopPropagation();reopenPick('q3ce')"><img src="${safeUrl(s.face)}" onerror="this.style.visibility='hidden'"><div><div style="font-weight:700">${escapeHtml(ceName(s))}</div><div style="font-size:12px;color:var(--muted)">${"★".repeat(s.rarity||0)}</div></div><span class="x" onclick="event.stopPropagation();q3CE=null;document.getElementById('q3cePicked').innerHTML=''">✕</span></div>`;});
-$("q2btn").onclick=()=>{if(!q2Servant){toast(t("toast_need_servant"));return;}const minNp=+$("q2np").value,srv=$("q2srv").value;
-  let res=load().filter(e=>slotsOf(e).some(sl=>sl.servant.id===q2Servant.id&&sl.np>=minNp));if(srv)res=res.filter(e=>e.server===srv);
-  activeClass.clear();activeRar.clear();activeSrv.clear();activeBoard.clear();renderStrips();
-  lastQueryLabel=servantLabel(q2Servant);
-  renderList(res,`${t("desc_contains")} ${servantLabel(q2Servant)} · NP≥${minNp}${srv?` · ${srvName(srv)}`:""}`);};
-$("q3btn").onclick=()=>{const cls=$("q3class").value,rar=+$("q3rar").value,minNp=+$("q3np").value,minSk=+$("q3skill").value,srv=$("q3srv").value,mlb=$("q3mlb").checked,asW=+$("q3aswhich").value,asL=+$("q3aslv").value;
-  const noteKw=$("q3note").value.trim().toLowerCase();
-  let res=load().filter(e=>{if(srv&&e.server!==srv)return false;
-    if(noteKw&&!(e.note||"").toLowerCase().includes(noteKw))return false;
-    return slotsOf(e).some(sl=>{
-      if(cls&&!classMatch(sl.servant.className,cls))return false;
-      if(rar&&sl.servant.rarity!==rar)return false;
-      if(q3Servant&&sl.servant.id!==q3Servant.id)return false;
-      if(minNp&&sl.np<minNp)return false;
-      if(minSk&&Math.min(...sl.skills)<minSk)return false;
-      if(asW&&asL&&!(sl.as[asW-1]>=asL))return false;
-      const ces=[sl.ce,sl.ceBond,sl.ceBonus].filter(Boolean);   // 冠位可裝 3 張，任一符合即可
-      if(q3CE&&!ces.some(c=>c.id===q3CE.id))return false;
-      if(mlb&&!ces.some(c=>c.lb===4))return false;return true;});});
+$("q2btn").onclick=async()=>{if(!q2Servant){toast(t("toast_need_servant"));return;}const minNp=+$("q2np").value,srv=$("q2srv").value;
+  clearChips();MODE="search";lastQueryLabel=servantLabel(q2Servant);
+  lastDesc=`${t("desc_contains")} ${servantLabel(q2Servant)} · NP≥${minNp}${srv?` · ${srvName(srv)}`:""}`;
+  /* 用 collectionNo 比對：跨伺服器同一位從者也找得到 */
+  try{lastCards=(await rpc("fgo_search_servant",{p_collection_no:q2Servant.collectionNo,p_min_np:minNp,p_server:srv||null})).map(normCard);}
+  catch(e){console.error(e);lastCards=[];toast(t("err_load"));}
+  paint(false);};
+$("q3btn").onclick=async()=>{const cls=$("q3class").value,rar=+$("q3rar").value,minNp=+$("q3np").value,minSk=+$("q3skill").value,srv=$("q3srv").value,mlb=$("q3mlb").checked,asW=+$("q3aswhich").value,asL=+$("q3aslv").value;
+  const noteKw=$("q3note").value.trim();
+  /* 所有格位條件必須由同一格位同時滿足（後端 exists 同一 s）；註記/伺服器則是該筆層級 */
+  const params={p_class:cls||null,p_rarity:rar||0,p_collection_no:q3Servant?q3Servant.collectionNo:null,
+    p_min_np:minNp||0,p_min_skill:minSk||0,p_as_which:asW||0,p_as_level:asL||0,
+    p_ce_id:q3CE?q3CE.id:null,p_mlb:!!mlb,p_server:srv||null,p_note_kw:noteKw||null};
   const parts=[];if(cls)parts.push(classLabel(cls));if(rar)parts.push("★"+rar);if(q3Servant)parts.push(servantLabel(q3Servant));
-  if(minNp)parts.push(`NP≥${minNp}`);if(minSk)parts.push(`SK≥${minSk}`);if(asW&&asL)parts.push(`AS${asW}≥${asL}`);if(q3CE)parts.push("🎴"+ceName(q3CE));if(mlb)parts.push("MLB");if(noteKw)parts.push("📝"+$("q3note").value.trim());if(srv)parts.push(srvName(srv));
-  activeClass.clear();activeRar.clear();activeSrv.clear();activeBoard.clear();renderStrips();
+  if(minNp)parts.push(`NP≥${minNp}`);if(minSk)parts.push(`SK≥${minSk}`);if(asW&&asL)parts.push(`AS${asW}≥${asL}`);if(q3CE)parts.push("🎴"+ceName(q3CE));if(mlb)parts.push("MLB");if(noteKw)parts.push("📝"+noteKw);if(srv)parts.push(srvName(srv));
+  clearChips();MODE="search";
   lastQueryLabel=q3Servant?servantLabel(q3Servant):(q3CE?ceName(q3CE):"");
-  renderList(res,parts.length?parts.join(" · "):t("tab3"));};
+  lastDesc=parts.length?parts.join(" · "):t("tab3");
+  try{lastCards=(await rpc("fgo_search_advanced",params)).map(normCard);}
+  catch(e){console.error(e);lastCards=[];toast(t("err_load"));}
+  paint(false);};
 $("q3reset").onclick=()=>{q3Servant=null;$("q3picked").innerHTML="";$("q3search").value="";q3CE=null;$("q3cePicked").innerHTML="";$("q3ce").value="";$("q3class").value="";$("q3rar").value="0";$("q3np").value="0";$("q3skill").value="0";$("q3srv").value="";$("q3aswhich").value="0";$("q3aslv").value="0";$("q3mlb").checked=false;$("q3note").value="";showAll();};
 
 /* ================= 顯示 ================= */
-let activeClass=new Set(),activeRar=new Set(),activeSrv=new Set(),activeBoard=new Set(),lastItems=[],lastDesc="",loading=true,onlyRecruiting=false,onlyGrand=false,SORT="updated",lastQueryLabel="";   /* 預設以最後更新排序：新鮮的助戰板優先 */
+let activeClass=new Set(),activeRar=new Set(),activeSrv=new Set(),activeBoard=new Set(),lastCards=[],lastTotal=0,MODE="browse",lastDesc="",loading=true,onlyRecruiting=false,onlyGrand=false,SORT="updated",lastQueryLabel="";   /* 預設以最後更新排序：新鮮的助戰板優先。MODE：browse=晶片瀏覽(後端分頁) / search=查詢結果(前端分頁) */
 function timeAgo(iso){if(!iso)return"";const d=(Date.now()-new Date(iso).getTime())/1000;if(d<60)return t("ago_now");if(d<3600)return Math.floor(d/60)+t("ago_min");if(d<86400)return Math.floor(d/3600)+t("ago_hr");return Math.floor(d/86400)+t("ago_day");}
 function applySort(arr){const a=arr.slice();if(SORT==="new")a.sort((x,y)=>(y.createdAt||"").localeCompare(x.createdAt||""));
   else if(SORT==="updated")a.sort((x,y)=>(y.updatedAt||"").localeCompare(x.updatedAt||""));
@@ -1069,7 +1079,7 @@ const BL_KEY="fgo_blacklist_v1";
 function loadBL(){try{const v=JSON.parse(localStorage.getItem(BL_KEY));
   return Array.isArray(v)?v.map(x=>digits(x)).filter(Boolean):[];}catch(e){return[];}}
 function saveBL(a){try{localStorage.setItem(BL_KEY,JSON.stringify(a));}catch(e){}}
-function block(code){const c=digits(code);if(!c)return;const bl=loadBL();if(!bl.includes(c)){bl.push(c);saveBL(bl);}renderBL();toast(t("bl_blocked_toast"));renderList(lastItems,lastDesc,true);}
+function block(code){const c=digits(code);if(!c)return;const bl=loadBL();if(!bl.includes(c)){bl.push(c);saveBL(bl);}renderBL();toast(t("bl_blocked_toast"));paint(true);}
 /* ===== 檢舉 ===== */
 let rpEntry=null;
 /* 檢舉原因一律存「代碼｜繁中說明」：代碼方便程式比對，繁中方便站長直接讀懂，
@@ -1100,7 +1110,7 @@ async function sendReport(){
     closeReport();toast(t("rp_sent"));
   }catch(e){console.error(e);toast(t("err_action"));}
   finally{btn.disabled=false;}}
-function unblock(code){const d=digits(code);saveBL(loadBL().filter(c=>c!==d));renderBL();toast(t("bl_unblocked_toast"));renderList(lastItems,lastDesc,true);}
+function unblock(code){const d=digits(code);saveBL(loadBL().filter(c=>c!==d));renderBL();toast(t("bl_unblocked_toast"));paint(true);}
 function renderBL(){const bl=loadBL();const cnt=$("blCount");if(cnt)cnt.textContent=bl.length;const p=$("blPanel");if(!p)return;
   p.innerHTML=bl.length?bl.map(c=>`<div class="bl-item"><span class="code">${escapeHtml(safeCode(c))}</span><span class="act" onclick="unblock('${safeCode(c)}')">${t("bl_unblock")}</span></div>`).join(""):`<div class="hint">${t("bl_empty")}</div>`;}
 let BOT_STAT=null;
@@ -1118,38 +1128,14 @@ function renderBotStat(){
   el.style.display="inline-flex";
 }
 function refreshDB(){
-  const es=load();
-  const players=new Set(es.map(e=>e.owner).filter(Boolean)).size||es.length;   // 同一人多伺服器只算一位
-  let svt=0;es.forEach(e=>{svt+=slotsOf(e).length;});
-  $("dbCount").innerHTML=t("stat_line").replace("{p}",players).replace("{s}",svt);
+  fetchStats();                                          // 頁首統計改由後端算
   const sel=$("q3class");const cur=sel.value;
   sel.innerHTML=`<option value="">${t("opt_unlimited")}</option>`+CLASSES_15.map(c=>`<option value="${c.key}">${classLabel(c.key)}</option>`).join("");sel.value=cur;
   const rs=$("rankClass");if(rs){const rc=rs.value;
     rs.innerHTML=`<option value="">${t("opt_unlimited")}</option>`+CLASSES_15.map(c=>`<option value="${c.key}">${classLabel(c.key)}</option>`).join("");rs.value=rc;}
   if($("rankOut"))renderRank();}
 /* ===== 使用排行 =====
-   以「有幾位玩家在用」計算，而不是算格位數 —— 否則一個人把同一位放進 6 個支援欄
-   就會灌爆排名。每位玩家對同一項目只計一次。 */
-function rankTally(srv,cls){
-  const svt=new Map(),ce=new Map(),combo=new Map();
-  /* 以 owner 集合去重：同一玩家不論跨板或跨伺服器重複放，同一項目都只計一次 */
-  const bump=(m,k,owner,info)=>{let r=m.get(k);if(!r){r={owners:new Set(),...info};m.set(k,r);}r.owners.add(owner);};
-  const rows=load().filter(e=>!srv||e.server===srv);
-  rows.forEach(e=>{
-    const o=e.owner;
-    slotsOf(e).forEach(sl=>{
-      const sv=sl.servant;if(!sv)return;
-      if(cls&&!classMatch(sv.className,cls))return;
-      if(sv.collectionNo!=null)bump(svt,sv.collectionNo,o,{face:sv.face,name:servantLabel(sv),sub:"★".repeat(sv.rarity||0)});
-      [sl.ce,sl.ceBond,sl.ceBonus].filter(Boolean).forEach(c=>{
-        if(c.id!=null)bump(ce,c.id,o,{face:c.face,name:ceName(c),sub:"★".repeat(c.rarity||0)});});
-      if(sv.collectionNo!=null&&sl.ce&&sl.ce.id!=null)
-        bump(combo,sv.collectionNo+"|"+sl.ce.id,o,{face:sv.face,face2:sl.ce.face,name:servantLabel(sv),sub:"🎴 "+ceName(sl.ce)});
-    });
-  });
-  const top=m=>[...m.values()].map(r=>({n:r.owners.size,face:r.face,face2:r.face2,name:r.name,sub:r.sub}))
-                 .sort((a,b)=>b.n-a.n).slice(0,10);
-  return {players:new Set(rows.map(e=>e.owner)).size,svt:top(svt),ce:top(ce),combo:top(combo)};}
+   以「有幾位玩家在用」計算（每位玩家對同一項目只計一次），去重在後端 fgo_rank 完成。 */
 function rankList(items,total){
   if(!items.length)return `<div class="hint" style="padding:8px 0">—</div>`;
   const max=items[0].n||1;
@@ -1159,14 +1145,22 @@ function rankList(items,total){
     <span class="rk-info"><span class="rk-name">${escapeHtml(it.name)}</span><span class="rk-sub">${escapeHtml(it.sub||"")}</span>
       <span class="rk-bar"><i style="width:${Math.round(it.n/max*100)}%"></i></span></span>
     <span class="rk-n">${it.n}<small> ${t("rank_players")}</small></span></div>`).join("");}
-function renderRank(){
+let rankSeq=0;
+async function renderRank(){
   const box=$("rankOut");if(!box)return;
-  const d=rankTally($("rankSrv").value,$("rankClass").value);
-  if(!d.players){box.innerHTML=`<div class="empty">${t("rank_none")}</div>`;return;}
+  const seq=++rankSeq;                                   // 連點下拉時只認最後一次結果
+  const srv=$("rankSrv").value,cls=$("rankClass").value;
+  let d;try{d=await rpc("fgo_rank",{p_server:srv||null,p_class:cls||null,p_limit:10});}
+  catch(e){console.error(e);if(seq===rankSeq)box.innerHTML=`<div class="empty">${t("rank_none")}</div>`;return;}
+  if(seq!==rankSeq)return;
+  if(!d||!d.players){box.innerHTML=`<div class="empty">${t("rank_none")}</div>`;return;}
+  const svt=(d.svt||[]).map(r=>({n:r.n,face:r.servant&&r.servant.face,name:servantLabel(r.servant),sub:"★".repeat((r.servant&&r.servant.rarity)||0)}));
+  const ce=(d.ce||[]).map(r=>({n:r.n,face:r.ce&&r.ce.face,name:ceName(r.ce),sub:"★".repeat((r.ce&&r.ce.rarity)||0)}));
+  const combo=(d.combo||[]).map(r=>({n:r.n,face:r.servant&&r.servant.face,face2:r.ce&&r.ce.face,name:servantLabel(r.servant),sub:"🎴 "+ceName(r.ce)}));
   box.innerHTML=`<div class="rk-note">${t("rank_based").replace("{n}",d.players)}</div>
-    <div class="rk-h">🧙 ${t("rank_svt")}</div>${rankList(d.svt)}
-    <div class="rk-h">🎴 ${t("rank_ce")}</div>${rankList(d.ce)}
-    <div class="rk-h">🔗 ${t("rank_combo")}</div>${rankList(d.combo)}`;}
+    <div class="rk-h">🧙 ${t("rank_svt")}</div>${rankList(svt)}
+    <div class="rk-h">🎴 ${t("rank_ce")}</div>${rankList(ce)}
+    <div class="rk-h">🔗 ${t("rank_combo")}</div>${rankList(combo)}`;}
 function slotPassFilter(sl){if(activeBoard.size&&!activeBoard.has(sl.boardKey))return false;if(activeClass.size&&![...activeClass].some(c=>classMatch(sl.servant.className,c)))return false;if(activeRar.size&&!activeRar.has(String(sl.servant.rarity)))return false;return true;}
 /* 複選晶片列：「全部」= 清空選取；其餘可多選（toggle） */
 function chipStrip(id,items,set,isRar){const el=$(id);if(!el)return;
@@ -1178,15 +1172,36 @@ function renderStrips(){
   chipStrip("srvstrip",[{key:"",label:t("strip_all")},{key:"JP",label:t("srv_jp")},{key:"NA",label:t("srv_na")},{key:"TW",label:t("srv_tw")},{key:"CN",label:t("srv_cn")}],activeSrv);
   chipStrip("boardstrip",[{key:"",label:t("strip_all")},...BOARDS.map(b=>({key:b.key,label:boardLabelOf(b)}))],activeBoard);
 }
-function showAll(){lastQueryLabel="";let items=load();
-  if(activeSrv.size)items=items.filter(e=>activeSrv.has(e.server));
-  if(activeClass.size||activeRar.size||activeBoard.size)items=items.filter(e=>slotsOf(e).some(slotPassFilter));
-  const d=[];
+function clearChips(){activeClass.clear();activeRar.clear();activeSrv.clear();activeBoard.clear();renderStrips();}
+/* 目前晶片組合的說明文字 */
+function browseDesc(){const d=[];
   if(activeSrv.size)d.push(t("lbl_server")+"："+[...activeSrv].map(srvName).join("、"));
   if(activeBoard.size)d.push(t("board_title")+"："+[...activeBoard].map(k=>boardLabelOf(BOARDS.find(b=>b.key===k))).join("、"));
   if(activeClass.size)d.push(t("desc_class")+"："+[...activeClass].map(classLabel).join("、"));
   if(activeRar.size)d.push(t("desc_rarity")+"："+[...activeRar].map(r=>"★"+r).join("、"));
-  renderList(items,d.length?d.join(" · "):t("result_all"));}
+  return d.length?d.join(" · "):t("result_all");}
+/* 晶片瀏覽：篩選/排序/分頁全部交給後端 fgo_list，一次只取一頁卡片（不含 boards） */
+let browseSeq=0;
+async function loadBrowse(page){
+  MODE="browse";lastQueryLabel="";if(page)curPage=Math.max(1,page);
+  lastDesc=browseDesc();
+  const seq=++browseSeq;                    // 連點晶片/翻頁時只認最後一次
+  const params={
+    p_servers:activeSrv.size?[...activeSrv]:null,
+    p_classes:activeClass.size?[...activeClass]:null,
+    p_rars:activeRar.size?[...activeRar].map(Number):null,
+    p_boards:activeBoard.size?[...activeBoard]:null,
+    p_recruiting:!!onlyRecruiting,p_grand:!!onlyGrand,
+    p_limit:PAGE_SIZE,p_offset:(curPage-1)*PAGE_SIZE,p_sort:SORT};
+  try{const d=await rpc("fgo_list",params);if(seq!==browseSeq)return;
+    lastCards=(d.rows||[]).map(normCard);lastTotal=d.total||0;}
+  catch(e){if(seq!==browseSeq)return;console.error("list",e);lastCards=[];lastTotal=0;toast(t("err_load"));}
+  paint(true);
+}
+function showAll(){MODE="browse";curPage=1;loadBrowse(1);}
+/* 重畫目前檢視：browse 需向後端重取（排序/篩選是後端參數，且回到第 1 頁）；search 前端重排即可 */
+function rerender(){if(MODE==="browse")loadBrowse(1);else paint(false);}
+function rerenderKeepPage(){if(MODE==="browse")loadBrowse(curPage);else paint(true);}
 function ceLbTxt(lb){if(!lb||lb<=0)return"";const l=lb===4?t("ce_mlb"):(LANG==="en"?("LB"+lb):(lb+t("ce_lb_unit")));return ` (${l})`;}
 function boardHtml(e){
   let slots=slotsOf(e);if(activeClass.size||activeRar.size||activeBoard.size)slots=slots.filter(slotPassFilter);
@@ -1210,17 +1225,46 @@ function boardHtml(e){
         </div></div>`).join("")}</div></div>`;}).join("");
 }
 const PAGE_SIZE=20;let curPage=1;
-function renderList(items,desc,keepPage){
-  lastItems=items;lastDesc=desc;if(!keepPage)curPage=1;
-  const bl=new Set(loadBL());let shown=items.filter(e=>!bl.has(digits(e.friendCode)));
-  if(onlyRecruiting)shown=shown.filter(e=>!e.full);
-  if(onlyGrand)shown=shown.filter(e=>slotsOf(e).some(sl=>sl.grand));
-  shown=applySort(shown);
-  $("resultDesc").textContent=desc||"";
-  const totalPages=Math.max(1,Math.ceil(shown.length/PAGE_SIZE));if(curPage>totalPages)curPage=totalPages;
-  $("count").innerHTML=`${shown.length} ${t("db_unit")}`+(totalPages>1?` · ${curPage}/${totalPages}`:"")+(shown.length?` <span class="copyhint">💡 ${t("copy_hint")}</span>`:"");
+function previewTitle(sl){const slot=SLOT_BY_KEY[sl.slotKey];const lbl=slot?slotLabelOf(slot):(sl.slotKey||"");return servantLabel(sl.servant)+" · "+lbl;}
+/* 一張登記卡：用後端預覽 preview（前 12 張頭像 + 名稱），不含完整 boards；展開時才單筆取 */
+function cardHtml(e){
+  const slots=e.preview||[];const cnt=e.slotCount||slots.length;const mine=e.isMine;const liked=MYLIKES.has(e.id);
+  return `<div class="entry${mine?' mine':''}${e.full?' full':''}"><div class="top">
+    <span class="code" title="copy" onclick="copyCode('${safeCode(e.friendCode)}')">${escapeHtml(safeCode(e.friendCode))}</span>
+    <span class="badge srv">${srvName(e.server)}</span>
+    <span class="badge ${e.full?'st-full':'st-open'}">${e.full?t("badge_full"):t("badge_open")}</span>
+    ${mine?`<span class="badge mine-badge">⭐ ${t("your_entry")}</span>`:''}
+    <button class="like-btn${liked?' liked':''}" data-id="${e.id}" onclick="likeEntry('${e.id}')" title="${t("like")}">👍 <span>${e.likes||0}</span></button>
+    <span class="entry-actions"><button class="more-btn" onclick="toggleMenu(event,this)" title="${t('more_actions')}">⋯</button><div class="more-menu"><div class="mi" onclick="shareEntry('${safeCode(e.friendCode)}')">🔗 ${t("share_link")}</div>${mine?'':`<div class="mi" onclick="openReport('${e.id}','${safeCode(e.friendCode)}','${e.server}')">🚩 ${t("report")}</div><div class="mi" onclick="block('${safeCode(e.friendCode)}')">🚫 ${t("bl_block")}</div>`}</div></span></div>
+    ${e.note?`<div class="entry-note">📝 ${escapeHtml(e.note)}</div>`:''}
+    ${e.updatedAt?`<div class="entry-updated">🕒 ${t("updated_lbl")} ${timeAgo(e.updatedAt)}</div>`:''}
+    ${slots.length?`<div class="preview" onclick="toggleBoard('${e.id}',this.nextElementSibling)">${slots.slice(0,12).map(sl=>`<img class="pav" src="${safeUrl(sl.face)}" title="${escapeHtml(previewTitle(sl))}" loading="lazy" onerror="this.style.display='none'">`).join("")}${cnt>12?`<span class="pmore">+${cnt-12}</span>`:''}</div>`:''}
+    <button class="expand-btn" data-cnt="${cnt}" onclick="toggleBoard('${e.id}',this)">▸ ${t("expand_board")} (${cnt})</button>
+    <div class="board-view" style="display:none"></div></div>`;
+}
+/* 依 MODE 重畫列表。browse：lastCards 已是後端整理好的「本頁」，分頁看 lastTotal；
+   search：對整包查詢結果在前端做黑名單/徵求中/冠位/排序/分頁。 */
+function paint(keepPage){
+  const bl=new Set(loadBL());
+  let cards=lastCards.filter(e=>!bl.has(digits(e.friendCode)));
+  let total,totalPages,pageCards;
+  if(MODE==="search"){
+    if(onlyRecruiting)cards=cards.filter(e=>!e.full);
+    if(onlyGrand)cards=cards.filter(e=>e.grand);
+    cards=applySort(cards);
+    if(!keepPage)curPage=1;
+    total=cards.length;totalPages=Math.max(1,Math.ceil(total/PAGE_SIZE));
+    if(curPage>totalPages)curPage=totalPages;
+    pageCards=cards.slice((curPage-1)*PAGE_SIZE,curPage*PAGE_SIZE);
+  }else{
+    total=lastTotal;totalPages=Math.max(1,Math.ceil(total/PAGE_SIZE));
+    if(curPage>totalPages)curPage=totalPages;
+    pageCards=cards;                       // 黑名單可能讓本頁少幾張；總數僅個人靜音、些微誤差可接受
+  }
+  $("resultDesc").textContent=lastDesc||"";
+  $("count").innerHTML=`${total} ${t("db_unit")}`+(totalPages>1?` · ${curPage}/${totalPages}`:"")+(total?` <span class="copyhint">💡 ${t("copy_hint")}</span>`:"");
   const list=$("list");
-  if(!shown.length){
+  if(!pageCards.length){
     /* 搜不到不要變死路：告訴他「還沒有人登記」並直接給登記入口 */
     list.innerHTML=loading?`<div class="empty">${t("loading")}</div>`
       :`<div class="empty"><div style="font-size:15px;color:var(--text);margin-bottom:6px">${
@@ -1228,36 +1272,27 @@ function renderList(items,desc,keepPage){
          <div style="margin-bottom:12px">${t("empty_be_first")}</div>
          <button class="btn gold" onclick="document.getElementById('regSection').scrollIntoView({behavior:'smooth',block:'start'})">＋ ${t("quick_register")}</button></div>`;
     renderPager(1);return;}
-  const pageItems=shown.slice((curPage-1)*PAGE_SIZE,curPage*PAGE_SIZE);
-  list.innerHTML=pageItems.map(e=>{
-    let slots=slotsOf(e);if(activeClass.size||activeRar.size||activeBoard.size)slots=slots.filter(slotPassFilter);
-    const mine=CURRENT_USER&&e.owner===CURRENT_USER.id;
-    const liked=MYLIKES.has(e.id);
-    return `<div class="entry${mine?' mine':''}${e.full?' full':''}"><div class="top">
-      <span class="code" title="copy" onclick="copyCode('${safeCode(e.friendCode)}')">${escapeHtml(safeCode(e.friendCode))}</span>
-      <span class="badge srv">${srvName(e.server)}</span>
-      <span class="badge ${e.full?'st-full':'st-open'}">${e.full?t("badge_full"):t("badge_open")}</span>
-      ${mine?`<span class="badge mine-badge">⭐ ${t("your_entry")}</span>`:''}
-      <button class="like-btn${liked?' liked':''}" data-id="${e.id}" onclick="likeEntry('${e.id}')" title="${t("like")}">👍 <span>${e.likes||0}</span></button>
-      <span class="entry-actions"><button class="more-btn" onclick="toggleMenu(event,this)" title="${t('more_actions')}">⋯</button><div class="more-menu"><div class="mi" onclick="shareEntry('${safeCode(e.friendCode)}')">🔗 ${t("share_link")}</div>${mine?'':`<div class="mi" onclick="openReport('${e.id}','${safeCode(e.friendCode)}','${e.server}')">🚩 ${t("report")}</div><div class="mi" onclick="block('${safeCode(e.friendCode)}')">🚫 ${t("bl_block")}</div>`}</div></span></div>
-      ${e.note?`<div class="entry-note">📝 ${escapeHtml(e.note)}</div>`:''}
-      ${e.updatedAt?`<div class="entry-updated">🕒 ${t("updated_lbl")} ${timeAgo(e.updatedAt)}</div>`:''}
-      ${slots.length?`<div class="preview" onclick="toggleBoard('${e.id}',this.nextElementSibling)">${slots.slice(0,12).map(sl=>`<img class="pav" src="${safeUrl(sl.servant.face)}" title="${escapeHtml(servantLabel(sl.servant)+" · "+sl.slotLabel)}" loading="lazy" onerror="this.style.display='none'">`).join("")}${slots.length>12?`<span class="pmore">+${slots.length-12}</span>`:''}</div>`:''}
-      <button class="expand-btn" data-cnt="${slots.length}" onclick="toggleBoard('${e.id}',this)">▸ ${t("expand_board")} (${slots.length})</button>
-      <div class="board-view" style="display:none"></div></div>`;}).join("");
+  list.innerHTML=pageCards.map(cardHtml).join("");
   renderPager(totalPages);
-  if(pageItems.length<=3)document.querySelectorAll("#list .expand-btn").forEach(b=>b.click()); // 少量結果自動展開
+  if(pageCards.length<=3)document.querySelectorAll("#list .expand-btn").forEach(b=>b.click()); // 少量結果自動展開
 }
-function toggleBoard(id,btn){const bv=btn.parentElement.querySelector(".board-view");const cnt=btn.dataset.cnt;
-  if(bv.style.display==="none"){if(!bv.dataset.filled){const e=load().find(x=>x.id===id);if(e){bv.innerHTML=boardHtml(e);bv.dataset.filled="1";}}bv.style.display="block";btn.innerHTML="▾ "+t("collapse_board")+" ("+cnt+")";}
-  else{bv.style.display="none";btn.innerHTML="▸ "+t("expand_board")+" ("+cnt+")";}}
+/* 展開才向後端單筆取完整 boards（fgo_boards），取到後快取在該卡的 board-view 上 */
+async function toggleBoard(id,btn){
+  const bv=btn.parentElement.querySelector(".board-view");const cnt=btn.dataset.cnt;
+  if(bv.style.display!=="none"){bv.style.display="none";btn.innerHTML="▸ "+t("expand_board")+" ("+cnt+")";return;}
+  bv.style.display="block";btn.innerHTML="▾ "+t("collapse_board")+" ("+cnt+")";
+  if(bv.dataset.filled)return;
+  bv.innerHTML=`<div class="hint" style="padding:8px 4px">${t("loading")}</div>`;
+  try{const boards=await rpc("fgo_boards",{p_entry_id:id});bv.innerHTML=boardHtml({boards:boards||{}});bv.dataset.filled="1";}
+  catch(e){console.error("boards",e);bv.innerHTML=`<div class="empty">${t("err_load")}</div>`;}
+}
 function pageRange(cur,total){const s=new Set([1,2,total,total-1,cur,cur-1,cur+1].filter(n=>n>=1&&n<=total));const arr=[...s].sort((a,b)=>a-b);const out=[];let prev=0;arr.forEach(n=>{if(n-prev>1)out.push("...");out.push(n);prev=n;});return out;}
 function renderPager(totalPages){const p=$("pager");if(!p)return;if(totalPages<=1){p.innerHTML="";return;}
   const mk=(n,label,dis,act)=>`<button class="pgbtn ${act?'active':''}" ${dis?'disabled':''} onclick="gotoPage(${n})">${label}</button>`;
   let h=mk(curPage-1,"‹",curPage<=1,false);
   pageRange(curPage,totalPages).forEach(n=>{h+= n==="..."?'<span class="pgdots">…</span>':mk(n,n,false,n===curPage);});
   h+=mk(curPage+1,"›",curPage>=totalPages,false);p.innerHTML=h;}
-function gotoPage(n){curPage=Math.max(1,parseInt(n)||1);renderList(lastItems,lastDesc,true);const s=$("clsstrip");if(s)s.scrollIntoView({behavior:"smooth",block:"start"});}
+function gotoPage(n){curPage=Math.max(1,parseInt(n)||1);if(MODE==="browse")loadBrowse(curPage);else paint(true);const s=$("clsstrip");if(s)s.scrollIntoView({behavior:"smooth",block:"start"});}
 ["rankSrv","rankClass"].forEach(id=>{const el=$(id);if(el)el.onchange=renderRank;});
 $("rpSend").onclick=sendReport;$("rpCancel").onclick=closeReport;
 $("rpMask").onclick=e=>{if(e.target===$("rpMask"))closeReport();};   // 點外面關閉
@@ -1268,7 +1303,7 @@ $("clearFilter").onclick=()=>{activeClass.clear();activeRar.clear();activeSrv.cl
   saveBL([]);renderBL();
   renderStrips();showAll();};
 /* 刪除自己在目前伺服器的登記（唯一的刪除入口，需二次確認） */
-function myEntry(){const srv=$("server").value;return CURRENT_USER?ENTRIES.find(e=>e.owner===CURRENT_USER.id&&e.server===srv):null;}
+function myEntry(){const srv=$("server").value;return CURRENT_USER?MINE.find(e=>e.server===srv):null;}
 function syncDelMine(){const b=$("delMineBtn");if(b)b.style.display=myEntry()?"":"none";}
 async function delMine(){
   const mine=myEntry();
@@ -1276,7 +1311,7 @@ async function delMine(){
   if(!confirm(t("confirm_del_mine").replace("{s}",srvName(mine.server))))return;
   const {error}=await sb.from("entries").delete().eq("id",mine.id);
   if(error){console.error(error);toast(t("err_del"));return;}
-  await fetchEntries();refreshDB();loadMyBoard();showAll();toast(t("toast_deleted"));
+  await fetchMine();refreshDB();loadMyBoard();showAll();toast(t("toast_deleted"));
 }
 /* 與 shareEntry/copyDC 一致：clipboard 不可用（Discord/LINE 內建瀏覽器、非安全內容）
    就退回 prompt 讓使用者自己複製；成功才跳 toast，不再失敗也謊報成功 */
@@ -1315,21 +1350,21 @@ $("lang").value=LANG;$("lang").onchange=e=>applyLang(e.target.value);
     ref:(document.referrer||"").slice(0,300)||null,
     lang:LANG,sess:s}).then(()=>{},()=>{});
 }catch(e){}})();
-applyLang(LANG);renderBL();initAuth();loadBotStat();   // 從者索引改為聚焦搜尋框時才載入
-fetchEntries().then(()=>{loading=false;refreshDB();renderStrips();
-  openSharedCode();                      // 有 ?code= 就直接開那筆，否則顯示全部
-  if(!draftBusy())loadMyBoard(true);});
-/* 分享連結入口：?code=100105588420 → 直接呈現那筆登記並展開 */
-function openSharedCode(){
+applyLang(LANG);renderBL();loadBotStat();   // 從者索引改為聚焦搜尋框時才載入
+refreshDB();renderStrips();                 // 頁首統計（向後端取）+ 晶片列
+initAuth();                                 // 登入狀態 → setUser 會載入本人板/讚，並在換人時重載列表
+/* 首畫：有 ?code= → 直接查那筆並展開；否則載入瀏覽列表 */
+openSharedCode().finally(()=>{loading=false;});
+/* 分享連結入口：?code=100105588420 → 以好友編號查詢呈現那筆登記並展開 */
+async function openSharedCode(){
   const raw=new URLSearchParams(location.search).get("code");
   const d=digits(raw||"");
-  if(!d){sharedView=false;showAll();return;}
-  sharedView=true;
-  const hit=load().filter(e=>digits(e.friendCode)===d);
-  if(!hit.length){lastQueryLabel=raw;renderList([],t("desc_code")+" "+raw);return;}
-  $("q1code").value=hit[0].friendCode;   // 讓查詢框同步顯示
-  lastQueryLabel=hit[0].friendCode;
-  renderList(hit,t("desc_code")+" "+hit[0].friendCode);
+  if(!d){sharedView=false;loading=false;await loadBrowse(1);return;}   // 無 ?code= → 一般瀏覽
+  sharedView=true;MODE="search";lastQueryLabel=raw;lastDesc=t("desc_code")+" "+raw;
+  let rows=[];try{rows=(await rpc("fgo_by_code",{p_code:d})).map(normCard);}catch(e){console.error(e);}
+  loading=false;lastCards=rows;
+  if(rows[0]){$("q1code").value=d;lastQueryLabel=safeCode(rows[0].friendCode);lastDesc=t("desc_code")+" "+safeCode(rows[0].friendCode);}
+  paint(false);
   const card=document.querySelector("#list .entry");if(card)card.scrollIntoView({behavior:"smooth",block:"center"});}
 </script>
 </body>
