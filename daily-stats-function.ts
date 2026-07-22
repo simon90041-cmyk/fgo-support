@@ -50,6 +50,26 @@ Deno.serve(async (req) => {
     }
     const s = await res.json();
 
+    // 各伺服器登記數：報表分服顯示，TW+JP 合計同時當同步管線金絲雀的基準
+    const SRV: Record<string, string> = { TW: "台服", JP: "日服", NA: "美服", CN: "國服" };
+    let srvLine = "";
+    let autoTotal = 0; // TW+JP = worker 自動同步對象
+    try {
+      const er = await fetch(`${SB_URL}/rest/v1/entries?select=server`, {
+        headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` },
+      });
+      const ej = await er.json();
+      if (Array.isArray(ej) && ej.length) {
+        const cnt: Record<string, number> = {};
+        for (const e of ej) cnt[e.server] = (cnt[e.server] || 0) + 1;
+        srvLine = Object.entries(cnt)
+          .sort((a, b) => b[1] - a[1])
+          .map(([k, v]) => `${SRV[k] || k} **${n(v)}**`)
+          .join(" ・ ");
+        autoTotal = (cnt.TW || 0) + (cnt.JP || 0);
+      }
+    } catch { /* 分服細分失敗不擋報表 */ }
+
     // ref/name 皆可被匿名寫入 → 去 markdown 特殊字元、截斷，避免破壞或偽造報表
     const mdSafe = (v: unknown, len: number) =>
       String(v ?? "").replace(/[`*_~|>@\\]/g, "").slice(0, len);
@@ -62,7 +82,7 @@ Deno.serve(async (req) => {
 
     const fields: any[] = [
       { name: "📈 過去 24 小時", value: `瀏覽 **${n(s.views_24h)}** ・ 訪客 **${n(s.visitors_24h)}**`, inline: false },
-      { name: "👥 登記狀況", value: `玩家 **${n(s.players)}** ・ 登記 **${n(s.entries)}** ・ 助戰從者 **${n(s.servants)}**`, inline: false },
+      { name: "👥 登記狀況", value: `玩家 **${n(s.players)}** ・ 登記 **${n(s.entries)}** ・ 助戰從者 **${n(s.servants)}**${srvLine ? `\n${srvLine}` : ""}`, inline: false },
       { name: "🆕 昨日異動", value: `新登記 **${n(s.new_24h)}** ・ 更新 **${n(s.updated_24h)}**`, inline: false },
       { name: "🔗 流量來源 Top5", value: refs, inline: false },
       { name: "🏆 最多人放的從者", value: svts, inline: false },
@@ -87,6 +107,10 @@ Deno.serve(async (req) => {
       const ageH = up ? (Date.now() - up) / 3.6e6 : Infinity;
       if (ageH > 12) warnings.push(`⚠ 機器人統計已 **${Number.isFinite(ageH) ? Math.round(ageH) + " 小時" : "從未"}** 未更新 — bot-stats 排程可能已停`);
     } catch { /* 監控本身失敗不影響報表 */ }
+    // (c) 同步管線：正常時 TW/JP 每天被整批更新數次 → updated_24h 應 ≥ 台日服登記數
+    const upd = Number(s.updated_24h ?? 0);
+    if (upd === 0) warnings.push("⚠ 過去 24 小時**沒有任何登記被更新** — 同步管線（模擬器 worker）可能已停");
+    else if (autoTotal && upd < autoTotal) warnings.push(`⚠ 昨日更新 **${n(upd)}**／自動同步對象 **${n(autoTotal)}** — worker 可能漏跑部分編號`);
     if (warnings.length) fields.push({ name: "🛎️ 系統警示", value: warnings.join("\n"), inline: false });
 
     const hookRes = await fetch(HOOK, {
