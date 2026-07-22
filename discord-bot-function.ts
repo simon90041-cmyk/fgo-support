@@ -43,6 +43,9 @@ function hex2bytes(hex: string): Uint8Array {
 }
 
 const SRV: Record<string, string> = { JP: "日服", NA: "美服", TW: "台服", CN: "國服" };
+// 有模擬器 worker、支援「自動匯入助戰」的伺服器。台服(instance0)＋日服(instance2)。
+// 其餘(NA/CN)無 worker → /fgo_bind 提示手動、/fgo_update 回 manual_server。
+const WORKER_SERVERS = ["TW", "JP"];
 
 function sName(s: any): string {
   if (!s) return "?";
@@ -255,7 +258,13 @@ Deno.serve(async (req) => {
       const bserver = String(opts.server || "").toUpperCase();
       const bcode = String(opts.code || "").replace(/\D/g, "");
       if (!SRV[bserver]) return eph("請選擇伺服器（JP／NA／TW／CN）。");
-      if (bcode.length < 6) return eph("請輸入正確的好友編號（純數字）。");
+      // 各伺服器已知位數（台服 12／日服 9）當場擋下、給明確訊息，防止打漏碼 → 之後同步一直查無資料
+      const NEED: Record<string, number> = { TW: 12, JP: 9 };
+      const need = NEED[bserver];
+      if (need ? bcode.length !== need : bcode.length < 6)
+        return eph(need
+          ? `${SRV[bserver]}好友編號是 **${need} 碼**，你輸入了 **${bcode.length} 碼**。請輸入完整 ${need} 碼（純數字，去掉空格與符號）。`
+          : "請輸入正確的好友編號（純數字）。");
       const res = await svcRpc("bot_register_code", {
         p_discord_id: discordId, p_server: bserver, p_friend_code: bcode,
       });
@@ -264,42 +273,50 @@ Deno.serve(async (req) => {
           return eph(`登記前請先用 **Discord 登入網站一次**（建立你的帳號）：\n${SITE}\n登入後再回來執行 /fgo_bind。`);
         if (res?.reason === "code_taken")
           return eph("這個好友編號已被登記於同伺服器。若是你的，請到網站檢舉處理。");
+        if (res?.reason === "bad_code")
+          return eph(`好友編號格式不對，${SRV[bserver]}請輸入${need ? ` **${need} 碼**` : "正確位數"}（純數字）。`);
         return eph("登記失敗，請稍後再試 🙏");
       }
       return eph(
         `✅ **已登記 ${SRV[bserver]}｜${safeCode(bcode)}**\n` +
-        (bserver === "TW"
-          ? "台服助戰會**自動同步**（通常隔天更新），不用再做任何事。\n"
-          : "此伺服器**請到網站手動填助戰板**（目前僅台服支援自動匯入）。\n") +
+        (WORKER_SERVERS.includes(bserver)
+          ? `${SRV[bserver]}助戰會**自動同步**（通常隔天更新，或用 /fgo_update 立即更新），不用再做任何事。\n`
+          : "此伺服器**請到網站手動填助戰板**（目前僅台服／日服支援自動匯入）。\n") +
         `到網站查看：${SITE}\n有問題可在網站檢舉。`,
       );
     }
 
-    // /fgo_update：立即更新自己的台服助戰（排入優先佇列，worker 幾分鐘內處理）。
-    // 冷卻由 bot_request_sync 內部把關（預設 30 分鐘），避免有人狂點洗佇列。
+    // /fgo_update：立即更新自己的助戰（台服＋日服，各自排入優先佇列，worker 幾分鐘內處理）。
+    // 無 server 參數 —— 對使用者有登記的每個 worker 伺服器各請求一次。
+    // 冷卻由 bot_request_sync 內部把關（每伺服器獨立，預設 30 分鐘），避免狂點洗佇列。
     if (cmd === "fgo_update") {
-      const r = await svcRpc("bot_request_sync", { p_discord_id: discordId, p_server: "TW" });
-      if (r?.ok) {
-        return eph(
-          `🔄 **已排入立即更新**（台服｜${safeCode(String(r.friend_code || ""))}）\n` +
-          "系統會在幾分鐘內抓取你最新的助戰並更新到網站。\n" +
-          `查看：${SITE}`,
-        );
+      const results: { srv: string; r: any }[] = [];
+      for (const srv of WORKER_SERVERS) {
+        results.push({ srv, r: await svcRpc("bot_request_sync", { p_discord_id: discordId, p_server: srv }) });
       }
-      if (r?.reason === "cooldown") {
-        const mins = Math.max(1, Math.ceil((Number(r.retry_after) || 60) / 60));
-        return eph(
-          `⏳ **冷卻中**，請再等約 **${mins} 分鐘** 後再試。\n` +
-          "（台服助戰本來就會每天自動同步，不手動更新也沒關係）",
-        );
-      }
-      if (r?.reason === "needs_login")
+      // 全部都要求先登入 → 提示登入網站建立帳號
+      if (results.every((x) => x.r?.reason === "needs_login"))
         return eph(`請先用 **Discord 登入網站一次**（建立你的帳號）：\n${SITE}`);
-      if (r?.reason === "no_entry")
-        return eph("你在台服還沒有登記。先用 `/fgo_bind server:TW code:<好友編號>` 登記。");
-      if (r?.reason === "manual_server")
-        return eph("目前只有**台服**支援自動匯入；其他伺服器請到網站手動維護助戰板。");
-      return eph("更新請求失敗，請稍後再試 🙏");
+      const queued = results.filter((x) => x.r?.ok);
+      const cooldown = results.filter((x) => x.r?.reason === "cooldown");
+      // 一個 worker 伺服器都沒登記（其餘都是 no_entry / manual_server）
+      if (queued.length === 0 && cooldown.length === 0)
+        return eph(
+          "你在**台服／日服**都還沒有登記。\n先用 `/fgo_bind server:TW｜JP code:<好友編號>` 登記，之後就會自動同步。",
+        );
+      const lines: string[] = [];
+      if (queued.length)
+        lines.push(
+          "🔄 **已排入立即更新**：" +
+          queued.map((x) => `${SRV[x.srv]}｜${safeCode(String(x.r.friend_code || ""))}`).join("、"),
+        );
+      if (cooldown.length) {
+        const mins = Math.max(...cooldown.map((x) => Math.ceil((Number(x.r.retry_after) || 60) / 60)), 1);
+        lines.push(`⏳ **冷卻中**（${cooldown.map((x) => SRV[x.srv]).join("、")}）：約 **${mins} 分鐘** 後可再試`);
+      }
+      if (queued.length) lines.push("系統會在幾分鐘內抓取你最新的助戰並更新到網站。");
+      lines.push(`查看：${SITE}`);
+      return eph(lines.join("\n"));
     }
 
     // /fgo_profile：顯示綁定狀態與各伺服器登記
