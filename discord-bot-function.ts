@@ -192,7 +192,9 @@ function fitEmbeds(embeds: any[], note = "…內容過長，其餘請看網站")
 
 /** 讀取登記：優先用 entries_view（含讚數），失敗退回 entries */
 async function fetchRows(server: string): Promise<any[]> {
-  const q = server ? `&server=eq.${server}` : "";
+  // 白名單淨化：非法/空 server → 不加篩選（查全部），杜絕把任意字串串進 PostgREST 查詢
+  const s = String(server || "").toUpperCase();
+  const q = SRV[s] ? `&server=eq.${s}` : "";
   try {
     const r = await fetch(
       `${SB_URL}/rest/v1/entries_view?select=*&order=like_count.desc,created_at.desc${q}`,
