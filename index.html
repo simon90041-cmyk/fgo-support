@@ -715,6 +715,9 @@ function makeServantSearcher(inputId,sugId,onPick,getCls,getDup){
     if(!res.length){sug.innerHTML='<div class="sug-item">—</div>';sug.style.display="block";return;}
     const dup=getDup?getDup():null;
     sug.innerHTML="";sug.style.display="block";
+    /* 瀏覽模式會列出全部從者（400+）：先組進 fragment 再一次掛上，
+       避免逐一 appendChild 造成的重複重排 */
+    const frag=document.createDocumentFragment();
     res.forEach(s=>{const d=document.createElement("div");
       const rec=(dup&&dup.get)?dup.get(s.collectionNo):null;
       const blocked=!!(rec&&rec.same.length);                 // 同組重複 → 擋
@@ -725,11 +728,18 @@ function makeServantSearcher(inputId,sugId,onPick,getCls,getDup){
       d.innerHTML=`<img src="${safeUrl(s.face)}" loading="lazy" onerror="this.style.visibility='hidden'"><div><div>${escapeHtml(servantLabel(s))}${tag}</div><div class="meta">${"★".repeat(s.rarity)} · ${escapeHtml(s.className)} · No.${escapeHtml(s.collectionNo)}</div></div>`;
       if(blocked)d.onclick=()=>toast(t("dup_hint")+rec.same.join("、"));
       else d.onclick=()=>{sug.style.display="none";input.value="";onPick(s);};
-      sug.appendChild(d);});}
+      frag.appendChild(d);});
+    sug.appendChild(frag);}
   function run(){const q=input.value.trim();const cls=getCls?getCls():null;render(q?searchServants(q,cls):browseServants(cls));}
   input.addEventListener("input",()=>{clearTimeout(timer);timer=setTimeout(run,150);});
-  /* 首次聚焦從者搜尋框才載入從者索引（~1.86MB）；純瀏覽好友碼的訪客完全不用付這個成本 */
-  input.addEventListener("focus",()=>{loadServants().then(run);run();});
+  /* 首次聚焦從者搜尋框才載入從者索引（~1.86MB）；純瀏覽好友碼的訪客完全不用付這個成本。
+     已載入就只畫一次 —— 原本 run() 與 loadServants().then(run) 都會跑，
+     等於每次聚焦都把整份清單（400+ 筆）重畫兩遍。 */
+  input.addEventListener("focus",()=>{
+    if(SERVANTS.length){run();return;}
+    run();                       // 尚未載入：先顯示「…」
+    loadServants().then(run);    // 到齊後再畫一次
+  });
 }
 /* 支援欄分兩組：常駐組（主要＋額外Ⅰ/Ⅱ）與活動組（活動Ⅰ/Ⅱ/Ⅲ）。
    同一組內不可重複從者；跨組可以重複（常駐放術傻、活動也放術傻是合法的）。 */
@@ -873,7 +883,9 @@ function renderBoardTabs(){
 function renderBoardGrid(){
   const bd=boardDraft[currentBoard]||{};
   $("boardGrid").innerHTML=CLASS_SLOTS.map(sl=>{const s=bd[sl.key];const lbl=slotLabelOf(sl);
-    if(s)return `<div class="slot filled ${editingKey===sl.key?'editing':''}" data-key="${sl.key}"><div class="slabel">${lbl}</div><img src="${safeUrl(s.servant.face)}" onerror="this.style.visibility='hidden'"><div class="sname">${escapeHtml(servantLabel(s.servant))}</div><div class="smini">${s.grand?'👑':''}${npHtml(s.np)}·${lvHtml(s.level)}</div></div>`;
+    /* 與 slotsOf 相同的守衛：殘缺格位（沒有 servant）只當空格畫，
+       不要讓一筆壞資料把整個登記 UI 打掛 */
+    if(s&&s.servant)return `<div class="slot filled ${editingKey===sl.key?'editing':''}" data-key="${sl.key}"><div class="slabel">${lbl}</div><img src="${safeUrl(s.servant.face)}" onerror="this.style.visibility='hidden'"><div class="sname">${escapeHtml(servantLabel(s.servant))}</div><div class="smini">${s.grand?'👑':''}${npHtml(s.np)}·${lvHtml(s.level)}</div></div>`;
     return `<div class="slot ${editingKey===sl.key?'editing':''}" data-key="${sl.key}"><div class="slabel">${lbl}</div><div class="plus">＋</div></div>`;}).join("");
   document.querySelectorAll("#boardGrid .slot").forEach(el=>el.onclick=()=>openEditor(el.dataset.key));
 }
@@ -882,9 +894,12 @@ function openEditor(key){editingKey=key;const sl=SLOT_BY_KEY[key];
   let note="";if(sl.cls==="extra")note=" ("+t("ed_only_extra")+")";else if(sl.cls)note=" ("+t("ed_only")+" "+sl.cls+")";
   $("edTitle").textContent=t("ed_edit")+"："+boardLabelOf(BOARDS.find(b=>b.key===currentBoard))+" / "+slotLabelOf(sl)+note;
   const cur=boardDraft[currentBoard][key];
-  edServant=cur?cur.servant:null;edCE=cur?cur.ce:null;
-  $("edNp").value="NP"+(cur?cur.np:1);$("edLv").value=cur?(cur.level||90):90;
-  [1,2,3].forEach(i=>$("edSk"+i).value=cur?cur.skills[i-1]:10);[1,2,3,4,5].forEach(i=>$("edAs"+i).value=cur?cur.as[i-1]:0);
+  edServant=(cur&&cur.servant)?cur.servant:null;edCE=cur?cur.ce:null;
+  /* 殘缺資料（缺 skills/as/np 陣列）不可以讓編輯器整個開不起來 —— 缺就套預設值 */
+  const cSk=Array.isArray(cur&&cur.skills)?cur.skills:[];
+  const cAs=Array.isArray(cur&&cur.as)?cur.as:[];
+  $("edNp").value="NP"+((cur&&+cur.np>=1&&+cur.np<=5)?+cur.np:1);$("edLv").value=(cur&&cur.level)||90;
+  [1,2,3].forEach(i=>$("edSk"+i).value=cSk[i-1]??10);[1,2,3,4,5].forEach(i=>$("edAs"+i).value=cAs[i-1]??0);
   $("edCeLb").value=cur&&cur.ce?cur.ce.lb:4;$("edSearch").value="";$("edCe").value="";
   /* 冠位配置（日服限定）：3 禮裝 */
   edCeBond=cur&&cur.ceBond?cur.ceBond:null;edCeBonus=cur&&cur.ceBonus?cur.ceBonus:null;
@@ -1258,12 +1273,17 @@ function syncDelMine(){const b=$("delMineBtn");if(b)b.style.display=myEntry()?""
 async function delMine(){
   const mine=myEntry();
   if(!mine){syncDelMine();return;}
-  if(!confirm(t("confirm_del_mine").replace("{s}",t("srv_"+String(mine.server).toLowerCase()))))return;
+  if(!confirm(t("confirm_del_mine").replace("{s}",srvName(mine.server))))return;
   const {error}=await sb.from("entries").delete().eq("id",mine.id);
   if(error){console.error(error);toast(t("err_del"));return;}
   await fetchEntries();refreshDB();loadMyBoard();showAll();toast(t("toast_deleted"));
 }
-function copyCode(c){navigator.clipboard.writeText(c.replace(/,/g,""));toast(t("toast_copied"));}
+/* 與 shareEntry/copyDC 一致：clipboard 不可用（Discord/LINE 內建瀏覽器、非安全內容）
+   就退回 prompt 讓使用者自己複製；成功才跳 toast，不再失敗也謊報成功 */
+function copyCode(c){const v=digits(c);const ok=()=>toast(t("toast_copied"));
+  if(navigator.clipboard&&navigator.clipboard.writeText)
+    navigator.clipboard.writeText(v).then(ok).catch(()=>prompt(t("copy_hint"),v));
+  else prompt(t("copy_hint"),v);}
 function copyDC(){const u="chensir";const ok=()=>toast(t("toast_copied"));
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(u).then(ok).catch(()=>prompt("Discord",u));
   else prompt("Discord",u);}
