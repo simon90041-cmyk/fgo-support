@@ -172,6 +172,7 @@
   .bl-item{display:flex;align-items:center;gap:14px;padding:4px 0}
   .bl-item .code{font-family:Consolas,monospace;font-size:14px;color:var(--text);letter-spacing:1px}
   .entry-note{font-size:12px;color:var(--muted);margin-top:8px;word-break:break-word}
+  .entry-player{font-size:13px;font-weight:700;color:var(--gold2);margin-top:6px;word-break:break-word}
   .preview{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:10px;cursor:pointer}
   .preview .pav{width:34px;height:34px;border-radius:7px;background:#000;object-fit:cover;border:1px solid var(--line)}
   .preview:hover .pav{border-color:var(--accent)}
@@ -246,7 +247,7 @@
   <!-- 搜尋 -->
   <div class="card">
     <div class="tabs">
-      <div class="tab active" data-pane="p1"><span class="t-num">1</span><span data-i18n="tab1">好友編號查詢</span></div>
+      <div class="tab active" data-pane="p1"><span class="t-num">1</span><span data-i18n="tab1">編號／玩家查詢</span></div>
       <div class="tab" data-pane="p2"><span class="t-num">2</span><span data-i18n="tab2">從者搜尋</span></div>
       <div class="tab" data-pane="p3"><span class="t-num">3</span><span data-i18n="tab3">多條件搜尋</span></div>
       <div class="tab" data-pane="p4"><span class="t-num">📊</span><span data-i18n="tab4">使用排行</span></div>
@@ -254,7 +255,7 @@
     <div class="pane active" id="p1">
       <div class="sec-sub" data-i18n="q1_sub" style="margin-bottom:8px">查詢某位玩家的整套助戰板</div>
       <div class="row">
-        <div style="flex:2"><input id="q1code" data-i18n-ph="q1_ph" placeholder="輸入好友編號（12 位數字）" maxlength="15"></div>
+        <div style="flex:2"><input id="q1code" data-i18n-ph="q1_ph" placeholder="輸入好友編號或玩家名稱" maxlength="40"></div>
         <div style="flex:0 0 auto"><button class="btn full" style="margin-top:0" id="q1btn" data-i18n="btn_query">查詢</button></div>
       </div>
     </div>
@@ -462,7 +463,7 @@
 /* ================= i18n ================= */
 const I18N={
  "zh-TW":{app_sub:"登記你的助戰陣容，或搜尋其他玩家的好友編號 · 全網共享、免費使用",db_label:"DB：",db_unit:"筆",stat_line:"<b>{p}</b> 位玩家 · 共 <b>{s}</b> 位助戰從者",bot_status:"🤖 機器人服務中 · <b>{g}</b> 個社群 · <b>{m}</b> 位成員",
-  tab1:"好友編號查詢",tab2:"從者搜尋",tab3:"進階搜尋",tab4:"使用排行",rank_sub:"看看大家的助戰都放誰、配什麼禮裝，不知道怎麼配的時候可以參考",rank_svt:"最多人放的從者",rank_ce:"最多人用的禮裝",rank_combo:"最熱門的從者＋禮裝搭配",rank_players:"人",rank_based:"統計自 {n} 筆登記（同一位玩家重複放只計一次）",rank_none:"這個條件下還沒有資料",loading:"載入中…",q1_sub:"查詢某位玩家的整套助戰板",q1_ph:"輸入好友編號（12 位數字）",btn_query:"查詢",
+  tab1:"編號／玩家查詢",tab2:"從者搜尋",tab3:"進階搜尋",tab4:"使用排行",rank_sub:"看看大家的助戰都放誰、配什麼禮裝，不知道怎麼配的時候可以參考",rank_svt:"最多人放的從者",rank_ce:"最多人用的禮裝",rank_combo:"最熱門的從者＋禮裝搭配",rank_players:"人",rank_based:"統計自 {n} 筆登記（同一位玩家重複放只計一次）",rank_none:"這個條件下還沒有資料",loading:"載入中…",q1_sub:"查詢某位玩家的整套助戰板",q1_ph:"輸入好友編號或玩家名稱",btn_query:"查詢",
   q2_sub:"找出助戰板中含有指定從者的玩家",lbl_servant:"助戰從者",servant_ph:"輸入從者中／英文名，如 梅林 / Merlin",lbl_minnp:"最低寶具等級(NP) ≥",lbl_server:"伺服器",srv_all:"全部",btn_search:"搜尋",
   q3_sub:"在助戰板中，找到「同一格」同時符合多個條件的玩家",grp_slot_servant:"職階 / 從者",lbl_class:"職階",lbl_np_ge:"寶具 NP ≥",lbl_servant_opt:"指定從者（選填）",servant_opt_ph:"不限從者，或輸入中／英文名指定",
   grp_skill_ce_srv:"寶具 / 技能 / 禮裝 / 伺服器",lbl_skill_ge:"每個技能 ≥",opt_unlimited:"不限",skill_max10:"10（滿技）",lbl_as_which:"指定附加技能 AS",lbl_as_ge:"該 AS 等級 ≥",chk_mlb:"滿破禮裝",grand_on:"👑 冠位配置（可裝 3 張禮裝）",lbl_ce_bond:"② 專屬羈絆禮裝",ed_ce_bond_ph:"選好從者會自動帶入，如 約定之刻",ed_ce_bonus_ph:"如 蒙娜麗莎 / 迦勒底午餐時光",lbl_bond_mode:"羈絆禮裝效果",bond_orig:"原效果",bond_np50:"初始 50NP",lbl_ce_bonus:"③ 經驗／加成禮裝",only_grand:"只看冠位",grand_short:"冠位配置",grand_prefix:"冠位",grand_need_svt:"請先選擇從者",grand_no_class:"此職階無冠位資格",grand_need_cond:"冠位資格需 Lv{lv} 且技能全 {sk}",btn_search_support:"搜尋助戰",btn_reset:"重設",
@@ -471,12 +472,12 @@ const I18N={
   ed_edit:"編輯格位",ed_search_ph:"搜尋從者（中／英文）",lbl_np:"寶具等級(NP)",lbl_lv:"角色等級 Lv",lbl_skills:"技能等級（1〜10）",lbl_as:"附加技能 AS（0=未裝，1〜10）",lbl_ce_opt:"常用禮裝（選填，依伺服器語言）",lbl_ce_search:"指定禮裝（選填）",ed_ce_ph:"如 萬華鏡 / Kaleidoscope",
   lbl_ce_lb:"禮裝突破數（0〜4，4 = 滿破）",ce_lb4:"4（滿破）",btn_apply:"套用此格",btn_clear:"清除此格",btn_save:"儲存整套助戰板",ed_only:"限",ed_only_extra:"限 Extra 職階",
   strip_all:"全部",slot_all:"全體",grp_ex:"額外",grp_ev:"活動",board_main:"主要",unit_slots:"格",srv_jp:"日服",srv_na:"美服",srv_tw:"台服",srv_cn:"國服",
-  desc_code:"好友編號",desc_contains:"含",desc_class:"職階",desc_rarity:"從者稀有度",
-  toast_saved:"助戰板登記成功！",toast_registered:"已登記！你的助戰會自動同步（通常隔天更新）。",note_auto_tw:"✅ 台服可自動匯入：填好編號直接按登記，助戰會自動同步（可不填助戰板）。",note_manual:"✋ 此伺服器需自行編排助戰板再登記（自動匯入僅台服）。",toast_manual_only:"此伺服器需自行填助戰板（自動匯入僅台服）。",toast_need_code:"請輸入完整好友編號",toast_need_board:"請至少填一個助戰格位",toast_need_servant:"請先選擇從者",toast_applied:"已套用",toast_cleared:"已清除此格",toast_copied:"已複製編號",
+  desc_code:"編號／玩家",player_name:"玩家名稱",desc_contains:"含",desc_class:"職階",desc_rarity:"從者稀有度",
+  toast_saved:"助戰板登記成功！",toast_registered:"已登記！你的助戰會自動同步（通常隔天更新）。",note_auto_tw:"✅ 此伺服器可自動匯入：填好編號直接按登記，助戰會自動同步（可不填助戰板）。",note_manual:"✋ 此伺服器需自行編排助戰板再登記（自動匯入僅限台服／日服；國服・美服請手動填寫）。",toast_manual_only:"此伺服器需自行填助戰板（自動匯入僅限台服／日服）。",toast_need_code:"請輸入完整好友編號",toast_need_board:"請至少填一個助戰格位",toast_need_servant:"請先選擇從者",toast_applied:"已套用",toast_cleared:"已清除此格",toast_copied:"已複製編號",
   del_mine:"刪除我在此伺服器的登記",confirm_del_mine:"確定刪除你在【{s}】的整套助戰板嗎？\n\n這個動作無法復原，所有已登記的助戰從者都會消失。",toast_deleted:"已刪除登記",confirm_switch_srv:"你有還沒儲存的助戰板內容。\n\n切換伺服器會清空目前的編輯，確定要切換嗎？",confirm_overwrite:"你在這個伺服器已經有一組登記（{n} 位助戰從者），但目前編輯區沒有載入它。\n\n繼續儲存會用現在這 {m} 位覆蓋掉原本的 {n} 位。\n\n建議先取消，重新整理頁面把原本的資料載入後再編輯。\n\n確定要直接覆蓋嗎？",confirm_del:"確定刪除這筆登記？",btn_del:"刪除",bl_title:"屏蔽",bl_block:"屏蔽",bl_unblock:"解除",bl_empty:"尚無屏蔽用戶",bl_blocked_toast:"已屏蔽",bl_unblocked_toast:"已解除屏蔽",list_empty:"沒有符合的登記。到下方登記你的助戰板吧！",err_load:"讀取失敗，請檢查網路",err_action:"操作失敗",err_save:"儲存失敗：",err_del:"刪除失敗",err_code_taken:"這個好友編號在該伺服器已經有人登記了",report:"檢舉",report_title:"檢舉這筆登記",report_reason:"檢舉原因",report_detail:"補充說明",report_contact:"聯絡方式（選填）",report_send:"送出檢舉",btn_cancel:"取消",rp_r1:"這是我的好友編號，被別人冒用",rp_r2:"內容不實／亂填",rp_r3:"註記有不當文字",rp_r4:"其他",rp_detail_ph:"請簡述情況，方便站長判斷",rp_contact_ph:"Discord 或 Email，方便回覆你",rp_need_detail:"請填寫補充說明",rp_sent:"已送出，感謝回報！我們會盡快處理",more_actions:"更多",
   dis1:"本站僅供玩家自行登記分享好友編號，所有資料由使用者手動輸入。從者與禮裝資料來源：Atlas Academy（api.atlasacademy.io）。",dis2:"本站與 TYPE-MOON / Aniplex / DELiGHTWORKS 無關，不會、也無法讀取任何玩家遊戲帳號資料。",dis3:"資料儲存在雲端（Supabase），全網玩家共享。需以 Discord 或 Email 登入才能登記；每個帳號每個伺服器一組助戰板，且只有本人能修改／刪除自己的登記。"},
  "zh-CN":{app_sub:"登记你的助战阵容，或搜索其他玩家的好友编号 · 全网共享、免费使用",db_label:"DB：",db_unit:"条",stat_line:"<b>{p}</b> 位玩家 · 共 <b>{s}</b> 位助战从者",bot_status:"🤖 机器人在线 · <b>{g}</b> 个社群 · <b>{m}</b> 位成员",
-  tab1:"好友编号查询",tab2:"从者搜索",tab3:"进阶搜索",tab4:"使用排行",rank_sub:"看看大家的助战都放谁、配什么礼装，不知道怎么配的时候可以参考",rank_svt:"最多人放的从者",rank_ce:"最多人用的礼装",rank_combo:"最热门的从者＋礼装搭配",rank_players:"人",rank_based:"统计自 {n} 笔登记（同一位玩家重复放只计一次）",rank_none:"这个条件下还没有数据",loading:"加载中…",q1_sub:"查询某位玩家的整套助战板",q1_ph:"输入好友编号（12 位数字）",btn_query:"查询",
+  tab1:"编号／玩家查询",tab2:"从者搜索",tab3:"进阶搜索",tab4:"使用排行",rank_sub:"看看大家的助战都放谁、配什么礼装，不知道怎么配的时候可以参考",rank_svt:"最多人放的从者",rank_ce:"最多人用的礼装",rank_combo:"最热门的从者＋礼装搭配",rank_players:"人",rank_based:"统计自 {n} 笔登记（同一位玩家重复放只计一次）",rank_none:"这个条件下还没有数据",loading:"加载中…",q1_sub:"查询某位玩家的整套助战板",q1_ph:"输入好友编号或玩家名称",btn_query:"查询",
   q2_sub:"找出助战板中含有指定从者的玩家",lbl_servant:"助战从者",servant_ph:"输入从者中／英文名，如 梅林 / Merlin",lbl_minnp:"最低宝具等级(NP) ≥",lbl_server:"服务器",srv_all:"全部",btn_search:"搜索",
   q3_sub:"在助战板中，找到「同一格」同时符合多个条件的玩家",grp_slot_servant:"职阶 / 从者",lbl_class:"职阶",lbl_np_ge:"宝具 NP ≥",lbl_servant_opt:"指定从者（选填）",servant_opt_ph:"不限从者，或输入中／英文名指定",
   grp_skill_ce_srv:"宝具 / 技能 / 礼装 / 服务器",lbl_skill_ge:"每个技能 ≥",opt_unlimited:"不限",skill_max10:"10（满技）",lbl_as_which:"指定附加技能 AS",lbl_as_ge:"该 AS 等级 ≥",chk_mlb:"满破礼装",grand_on:"👑 冠位配置（可装 3 张礼装）",lbl_ce_bond:"② 专属羁绊礼装",ed_ce_bond_ph:"选好从者会自动带入，如 约定之刻",ed_ce_bonus_ph:"如 蒙娜丽莎 / 迦勒底午餐时光",lbl_bond_mode:"羁绊礼装效果",bond_orig:"原效果",bond_np50:"初始 50NP",lbl_ce_bonus:"③ 经验／加成礼装",only_grand:"只看冠位",grand_short:"冠位配置",grand_prefix:"冠位",grand_need_svt:"请先选择从者",grand_no_class:"此职阶无冠位资格",grand_need_cond:"冠位资格需 Lv{lv} 且技能全 {sk}",btn_search_support:"搜索助战",btn_reset:"重置",
@@ -485,12 +486,12 @@ const I18N={
   ed_edit:"编辑格位",ed_search_ph:"搜索从者（中／英文）",lbl_np:"宝具等级(NP)",lbl_lv:"角色等级 Lv",lbl_skills:"技能等级（1〜10）",lbl_as:"附加技能 AS（0=未装，1〜10）",lbl_ce_opt:"常用礼装（选填，依服务器语言）",lbl_ce_search:"指定礼装（选填）",ed_ce_ph:"如 万华镜 / Kaleidoscope",
   lbl_ce_lb:"礼装突破数（0〜4，4 = 满破）",ce_lb4:"4（满破）",btn_apply:"应用此格",btn_clear:"清除此格",btn_save:"保存整套助战板",ed_only:"限",ed_only_extra:"限 Extra 职阶",
   strip_all:"全部",slot_all:"全体",grp_ex:"额外",grp_ev:"活动",board_main:"主要",unit_slots:"格",srv_jp:"日服",srv_na:"美服",srv_tw:"台服",srv_cn:"国服",
-  desc_code:"好友编号",desc_contains:"含",desc_class:"职阶",desc_rarity:"从者稀有度",
-  toast_saved:"助战板登记成功！",toast_registered:"已登记！你的助战会自动同步（通常隔天更新）。",note_auto_tw:"✅ 台服可自动导入：填好编号直接按登记，助战会自动同步（可不填助战板）。",note_manual:"✋ 此服务器需自行编排助战板再登记（自动导入仅台服）。",toast_manual_only:"此服务器需自行填助战板（自动导入仅台服）。",toast_need_code:"请输入完整好友编号",toast_need_board:"请至少填一个助战格位",toast_need_servant:"请先选择从者",toast_applied:"已应用",toast_cleared:"已清除此格",toast_copied:"已复制编号",
+  desc_code:"编号／玩家",player_name:"玩家名称",desc_contains:"含",desc_class:"职阶",desc_rarity:"从者稀有度",
+  toast_saved:"助战板登记成功！",toast_registered:"已登记！你的助战会自动同步（通常隔天更新）。",note_auto_tw:"✅ 此服务器可自动导入：填好编号直接按登记，助战会自动同步（可不填助战板）。",note_manual:"✋ 此服务器需自行编排助战板再登记（自动导入仅限台服／日服；国服・美服请手动填写）。",toast_manual_only:"此服务器需自行填助战板（自动导入仅限台服／日服）。",toast_need_code:"请输入完整好友编号",toast_need_board:"请至少填一个助战格位",toast_need_servant:"请先选择从者",toast_applied:"已应用",toast_cleared:"已清除此格",toast_copied:"已复制编号",
   del_mine:"删除我在此服务器的登记",confirm_del_mine:"确定删除你在【{s}】的整套助战板吗？\n\n这个动作无法复原，所有已登记的助战从者都会消失。",toast_deleted:"已删除登记",confirm_switch_srv:"你有还没保存的助战板内容。\n\n切换服务器会清空目前的编辑，确定要切换吗？",confirm_overwrite:"你在这个服务器已经有一组登记（{n} 位助战从者），但目前编辑区没有载入它。\n\n继续保存会用现在这 {m} 位覆盖掉原本的 {n} 位。\n\n建议先取消，刷新页面把原本的数据载入后再编辑。\n\n确定要直接覆盖吗？",confirm_del:"确定删除这笔登记？",btn_del:"删除",bl_title:"屏蔽",bl_block:"屏蔽",bl_unblock:"解除",bl_empty:"尚无屏蔽用户",bl_blocked_toast:"已屏蔽",bl_unblocked_toast:"已解除屏蔽",list_empty:"没有符合的登记。到下方登记你的助战板吧！",err_load:"读取失败，请检查网络",err_action:"操作失败",err_save:"保存失败：",err_del:"删除失败",err_code_taken:"这个好友编号在该服务器已经有人登记了",report:"举报",report_title:"举报这笔登记",report_reason:"举报原因",report_detail:"补充说明",report_contact:"联系方式（选填）",report_send:"送出举报",btn_cancel:"取消",rp_r1:"这是我的好友编号，被别人冒用",rp_r2:"内容不实／乱填",rp_r3:"注记有不当文字",rp_r4:"其他",rp_detail_ph:"请简述情况，方便站长判断",rp_contact_ph:"Discord 或 Email，方便回复你",rp_need_detail:"请填写补充说明",rp_sent:"已送出，感谢回报！我们会尽快处理",more_actions:"更多",
   dis1:"本站仅供玩家自行登记分享好友编号，所有资料由使用者手动输入。从者与礼装资料来源：Atlas Academy（api.atlasacademy.io）。",dis2:"本站与 TYPE-MOON / Aniplex / DELiGHTWORKS 无关，不会、也无法读取任何玩家游戏账号资料。",dis3:"数据储存在云端（Supabase），全网玩家共享。需以 Discord 或 Email 登录才能登记；每个账号每个服务器一组助战板，且只有本人能修改／删除自己的登记。"},
  "en":{app_sub:"Register your support servants, or find other players' friend codes · Free & shared by everyone",db_label:"DB: ",db_unit:"entries",stat_line:"<b>{p}</b> players · <b>{s}</b> support servants",bot_status:"🤖 Bot online · <b>{g}</b> servers · <b>{m}</b> members",
-  tab1:"Friend Code",tab2:"Servant",tab3:"Advanced",tab4:"Rankings",rank_sub:"See which servants and CEs everyone is running — handy when you are not sure what to set.",rank_svt:"Most used servants",rank_ce:"Most used CEs",rank_combo:"Most popular servant + CE pairs",rank_players:"players",rank_based:"Based on {n} entries (each player counted once per item)",rank_none:"No data for this filter yet",loading:"Loading…",q1_sub:"Look up a player's full support boards",q1_ph:"Enter friend code (12 digits)",btn_query:"Search",
+  tab1:"Code / Player",tab2:"Servant",tab3:"Advanced",tab4:"Rankings",rank_sub:"See which servants and CEs everyone is running — handy when you are not sure what to set.",rank_svt:"Most used servants",rank_ce:"Most used CEs",rank_combo:"Most popular servant + CE pairs",rank_players:"players",rank_based:"Based on {n} entries (each player counted once per item)",rank_none:"No data for this filter yet",loading:"Loading…",q1_sub:"Look up a player's full support boards",q1_ph:"Friend code or player name",btn_query:"Search",
   q2_sub:"Find players whose board contains a servant",lbl_servant:"Support servant",servant_ph:"Type a servant name, e.g. Merlin",lbl_minnp:"Min NP level ≥",lbl_server:"Server",srv_all:"All",btn_search:"Search",
   q3_sub:"Find players whose single slot matches all conditions",grp_slot_servant:"Class / Servant",lbl_class:"Class",lbl_np_ge:"NP ≥",lbl_servant_opt:"Servant (optional)",servant_opt_ph:"Any servant, or type a name",
   grp_skill_ce_srv:"NP / Skills / CE / Server",lbl_skill_ge:"Each skill ≥",opt_unlimited:"Any",skill_max10:"10 (max)",lbl_as_which:"Append skill (AS)",lbl_as_ge:"AS level ≥",chk_mlb:"MLB CE",grand_on:"👑 Grand setup (3 CEs)",lbl_ce_bond:"② Bond CE",ed_ce_bond_ph:"Auto-filled from the servant's own bond CE",ed_ce_bonus_ph:"e.g. Mona Lisa / Chaldea Lunchtime",lbl_bond_mode:"Bond CE effect",bond_orig:"Original effect",bond_np50:"50% starting NP",lbl_ce_bonus:"③ EXP / bonus CE",only_grand:"Grand only",grand_short:"Grand setup",grand_prefix:"Grand ",grand_need_svt:"Pick a servant first",grand_no_class:"This class cannot become Grand",grand_need_cond:"Grand requires Lv{lv} and all skills {sk}",btn_search_support:"Search",btn_reset:"Reset",
@@ -499,12 +500,12 @@ const I18N={
   ed_edit:"Edit slot",ed_search_ph:"Search servant",lbl_np:"NP level",lbl_lv:"Level",lbl_skills:"Skill levels (1–10)",lbl_as:"Append skills AS (0=none, 1–10)",lbl_ce_opt:"Common CE (optional, server language)",lbl_ce_search:"Craft Essence (optional)",ed_ce_ph:"e.g. Kaleidoscope",
   lbl_ce_lb:"CE limit break (0–4, 4 = MLB)",ce_lb4:"4 (MLB)",btn_apply:"Apply",btn_clear:"Clear",btn_save:"Save support boards",ed_only:"only",ed_only_extra:"Extra classes only",
   strip_all:"All",slot_all:"All",grp_ex:"Extra",grp_ev:"Event",board_main:"Main",unit_slots:"slots",srv_jp:"JP",srv_na:"NA",srv_tw:"TW",srv_cn:"CN",
-  desc_code:"Friend code",desc_contains:"Contains",desc_class:"Class",desc_rarity:"Servant rarity",
-  toast_saved:"Support boards saved!",toast_registered:"Registered! Your supports sync automatically (usually next day).",note_auto_tw:"✅ TW auto-import: enter your code and hit Register — supports sync automatically (board optional).",note_manual:"✋ This server is manual: build your board before registering (auto-import is TW only).",toast_manual_only:"This server needs a manual board (auto-import is TW only).",toast_need_code:"Enter a full friend code",toast_need_board:"Fill at least one slot",toast_need_servant:"Select a servant first",toast_applied:"Applied",toast_cleared:"Slot cleared",toast_copied:"Code copied",
+  desc_code:"Code / Player",player_name:"Player",desc_contains:"Contains",desc_class:"Class",desc_rarity:"Servant rarity",
+  toast_saved:"Support boards saved!",toast_registered:"Registered! Your supports sync automatically (usually next day).",note_auto_tw:"✅ Auto-import supported: enter your code and hit Register — supports sync automatically (board optional).",note_manual:"✋ This server is manual: build your board before registering (auto-import is TW/JP only; NA & CN must be filled in by hand).",toast_manual_only:"This server needs a manual board (auto-import is TW/JP only).",toast_need_code:"Enter a full friend code",toast_need_board:"Fill at least one slot",toast_need_servant:"Select a servant first",toast_applied:"Applied",toast_cleared:"Slot cleared",toast_copied:"Code copied",
   del_mine:"Delete my entry on this server",confirm_del_mine:"Delete your entire support board on {s}?\n\nThis cannot be undone. Every servant you registered will be removed.",toast_deleted:"Entry deleted",confirm_switch_srv:"You have unsaved support board changes.\n\nSwitching servers will discard them. Continue?",confirm_overwrite:"You already have an entry on this server ({n} servants), but it is not loaded in the editor.\n\nSaving now will replace those {n} with the {m} currently shown.\n\nRecommended: cancel, reload the page so your existing board loads, then edit.\n\nOverwrite anyway?",confirm_del:"Delete this entry?",btn_del:"Delete",bl_title:"Blocklist",bl_block:"Block",bl_unblock:"Unblock",bl_empty:"No blocked users",bl_blocked_toast:"User blocked",bl_unblocked_toast:"Unblocked",list_empty:"No matching entries. Register your board below!",err_load:"Failed to load. Check your connection.",err_action:"Action failed",err_save:"Save failed: ",err_del:"Delete failed",err_code_taken:"That friend code is already registered on this server",report:"Report",report_title:"Report this entry",report_reason:"Reason",report_detail:"Details",report_contact:"Contact (optional)",report_send:"Send report",btn_cancel:"Cancel",rp_r1:"This is my friend code, someone else registered it",rp_r2:"Fake or inaccurate content",rp_r3:"Inappropriate note text",rp_r4:"Other",rp_detail_ph:"Briefly describe the issue",rp_contact_ph:"Discord or Email, so we can reply",rp_need_detail:"Please add some details",rp_sent:"Sent — thanks for reporting!",more_actions:"More",
   dis1:"This site is for players to voluntarily register and share friend codes; all data is entered manually. Servant/CE data: Atlas Academy (api.atlasacademy.io).",dis2:"Not affiliated with TYPE-MOON / Aniplex / DELiGHTWORKS. It does not and cannot read any player game account data.",dis3:"Data is stored in the cloud (Supabase) and shared by all players. Discord or Email login is required to register; one board per account per server, and you can only edit/delete your own entries."},
  "ja":{app_sub:"あなたのサポート編成を登録、または他プレイヤーのフレンドIDを検索 · 全体共有・無料",db_label:"DB：",db_unit:"件",stat_line:"<b>{p}</b> 人が登録 · 計 <b>{s}</b> 騎のサポート",bot_status:"🤖 Bot 稼働中 · <b>{g}</b> サーバー · <b>{m}</b> メンバー",
-  tab1:"フレンドID検索",tab2:"サーヴァント検索",tab3:"詳細検索",tab4:"使用ランキング",rank_sub:"みんながどのサーヴァント・礼装を置いているかの参考に",rank_svt:"よく置かれるサーヴァント",rank_ce:"よく使われる礼装",rank_combo:"人気のサーヴァント＋礼装",rank_players:"人",rank_based:"{n} 件の登録から集計（同一プレイヤーは1回のみ）",rank_none:"この条件のデータはまだありません",loading:"読み込み中…",q1_sub:"プレイヤーのサポート編成を検索",q1_ph:"フレンドID（12桁）を入力",btn_query:"検索",
+  tab1:"ID／プレイヤー検索",tab2:"サーヴァント検索",tab3:"詳細検索",tab4:"使用ランキング",rank_sub:"みんながどのサーヴァント・礼装を置いているかの参考に",rank_svt:"よく置かれるサーヴァント",rank_ce:"よく使われる礼装",rank_combo:"人気のサーヴァント＋礼装",rank_players:"人",rank_based:"{n} 件の登録から集計（同一プレイヤーは1回のみ）",rank_none:"この条件のデータはまだありません",loading:"読み込み中…",q1_sub:"プレイヤーのサポート編成を検索",q1_ph:"フレンドIDまたはプレイヤー名",btn_query:"検索",
   q2_sub:"指定サーヴァントを編成しているプレイヤーを検索",lbl_servant:"サポートサーヴァント",servant_ph:"サーヴァント名を入力（例：マーリン / Merlin）",lbl_minnp:"最低宝具レベル(NP) ≥",lbl_server:"サーバー",srv_all:"すべて",btn_search:"検索",
   q3_sub:"同一スロットで全条件を満たすプレイヤーを検索",grp_slot_servant:"クラス / サーヴァント",lbl_class:"クラス",lbl_np_ge:"宝具 NP ≥",lbl_servant_opt:"サーヴァント（任意）",servant_opt_ph:"指定なし、または名前を入力",
   grp_skill_ce_srv:"宝具 / スキル / 礼装 / サーバー",lbl_skill_ge:"各スキル ≥",opt_unlimited:"指定なし",skill_max10:"10（カンスト）",lbl_as_which:"アペンドスキル(AS)",lbl_as_ge:"AS レベル ≥",chk_mlb:"最大突破礼装",grand_on:"👑 冠位編成（礼装3枠）",lbl_ce_bond:"② 専用絆礼装",ed_ce_bond_ph:"サーヴァント選択で自動入力（例：約束の刻）",ed_ce_bonus_ph:"例：モナ・リザ／カルデア・ランチタイム",lbl_bond_mode:"絆礼装の効果",bond_orig:"本来の効果",bond_np50:"NP初期50%",lbl_ce_bonus:"③ 経験値／ボーナス礼装",only_grand:"冠位のみ",grand_short:"冠位編成",grand_prefix:"グランド",grand_need_svt:"先にサーヴァントを選択",grand_no_class:"このクラスは冠位不可",grand_need_cond:"冠位条件：Lv{lv}・スキル全{sk}",btn_search_support:"検索",btn_reset:"リセット",
@@ -513,8 +514,8 @@ const I18N={
   ed_edit:"枠を編集",ed_search_ph:"サーヴァントを検索",lbl_np:"宝具レベル(NP)",lbl_lv:"レベル Lv",lbl_skills:"スキルレベル（1〜10）",lbl_as:"アペンドスキル AS（0=未装備, 1〜10）",lbl_ce_opt:"常用礼装（任意・サーバー言語）",lbl_ce_search:"礼装を指定（任意）",ed_ce_ph:"例：カレイドスコープ",
   lbl_ce_lb:"礼装限界突破（0〜4, 4 = 最大突破）",ce_lb4:"4（最大突破）",btn_apply:"適用",btn_clear:"クリア",btn_save:"サポート編成を保存",ed_only:"限定：",ed_only_extra:"エクストラ限定",
   strip_all:"すべて",slot_all:"全体",grp_ex:"エクストラ",grp_ev:"イベント",board_main:"メイン",unit_slots:"枠",srv_jp:"日本",srv_na:"北米",srv_tw:"台湾",srv_cn:"中国",
-  desc_code:"フレンドID",desc_contains:"編成:",desc_class:"クラス",desc_rarity:"サーヴァントレアリティ",
-  toast_saved:"サポート編成を登録しました！",toast_registered:"登録しました！サポートは自動で同期されます（通常翌日）。",note_auto_tw:"✅ 台湾は自動取得：IDを入れて登録するだけでサポートが自動同期（編成入力は任意）。",note_manual:"✋ このサーバーは手動：編成を作ってから登録してください（自動取得は台湾のみ）。",toast_manual_only:"このサーバーは編成の手動入力が必要です（自動取得は台湾のみ）。",toast_need_code:"フレンドIDを入力してください",toast_need_board:"少なくとも1枠を入力してください",toast_need_servant:"先にサーヴァントを選択してください",toast_applied:"適用しました",toast_cleared:"枠をクリアしました",toast_copied:"IDをコピーしました",
+  desc_code:"ID／プレイヤー",player_name:"プレイヤー名",desc_contains:"編成:",desc_class:"クラス",desc_rarity:"サーヴァントレアリティ",
+  toast_saved:"サポート編成を登録しました！",toast_registered:"登録しました！サポートは自動で同期されます（通常翌日）。",note_auto_tw:"✅ このサーバーは自動取得対応：IDを入れて登録するだけでサポートが自動同期（編成入力は任意）。",note_manual:"✋ このサーバーは手動：編成を作ってから登録してください（自動取得は台湾／日本のみ・北米／中国は手動入力）。",toast_manual_only:"このサーバーは編成の手動入力が必要です（自動取得は台湾／日本のみ）。",toast_need_code:"フレンドIDを入力してください",toast_need_board:"少なくとも1枠を入力してください",toast_need_servant:"先にサーヴァントを選択してください",toast_applied:"適用しました",toast_cleared:"枠をクリアしました",toast_copied:"IDをコピーしました",
   del_mine:"このサーバーの登録を削除",confirm_del_mine:"【{s}】のサポート編成をすべて削除しますか？\n\nこの操作は取り消せません。登録済みのサーヴァントはすべて消えます。",toast_deleted:"登録を削除しました",confirm_switch_srv:"保存していないサポート編成があります。\n\nサーバーを切り替えると編集内容は破棄されます。続行しますか？",confirm_overwrite:"このサーバーには既に登録があります（{n} 騎）が、編集画面に読み込まれていません。\n\nこのまま保存すると、その {n} 騎が現在の {m} 騎で上書きされます。\n\n一度キャンセルしてページを再読み込みし、既存の編成を読み込んでから編集することを推奨します。\n\n上書きしますか？",confirm_del:"この登録を削除しますか？",btn_del:"削除",bl_title:"ブロックリスト",bl_block:"ブロック",bl_unblock:"解除",bl_empty:"ブロック中のユーザーなし",bl_blocked_toast:"ブロックしました",bl_unblocked_toast:"ブロック解除しました",list_empty:"該当する登録がありません。下で編成を登録してください！",err_load:"読み込みに失敗しました。通信を確認してください",err_action:"操作に失敗しました",err_save:"保存に失敗しました：",err_del:"削除に失敗しました",err_code_taken:"このフレンドIDは同サーバーで既に登録されています",report:"通報",report_title:"この登録を通報",report_reason:"通報理由",report_detail:"詳細",report_contact:"連絡先（任意）",report_send:"通報する",btn_cancel:"キャンセル",rp_r1:"自分のフレンドIDが他人に登録されている",rp_r2:"内容が事実と異なる",rp_r3:"メモに不適切な表現",rp_r4:"その他",rp_detail_ph:"状況を簡単にご記入ください",rp_contact_ph:"Discord または Email（返信用）",rp_need_detail:"詳細をご記入ください",rp_sent:"送信しました。ご報告ありがとうございます",more_actions:"その他",
   dis1:"本サイトはプレイヤーが自主的にフレンドIDを登録・共有するためのものです。全データは手動入力。サーヴァント／礼装データ：Atlas Academy（api.atlasacademy.io）。",dis2:"TYPE-MOON / Aniplex / DELiGHTWORKS とは無関係です。いかなるプレイヤーのゲームアカウント情報も読み取りません／読み取れません。",dis3:"データはクラウド（Supabase）に保存され、全プレイヤーで共有されます。登録にはDiscordまたはEmailでのログインが必要。アカウントごと・サーバーごとに編成は1つで、自分の登録のみ編集／削除できます。"}
 };
@@ -543,6 +544,7 @@ async function rpc(fn,params){const {data,error}=await sb.rpc(fn,params||{});if(
    傳輸量因此砍掉九成。是不是本人也由後端 is_mine（auth.uid()）決定，前端不再看得到 owner。 */
 function normCard(c){return{
   id:c.id, server:safeSrv(c.server), friendCode:c.friend_code||"", note:c.note||"",
+  userName:c.user_name||"", userLv:c.user_lv||null,
   full:!!c.is_full, likes:c.likes||0, isMine:!!c.is_mine,
   createdAt:c.created_at, updatedAt:c.updated_at||c.created_at,
   slotCount:c.slots||0, grand:!!c.grand,
@@ -621,6 +623,8 @@ function escapeHtml(s){return String(s==null?"":s).replace(/[&<>"']/g,m=>({'&':'
 /* 好友編號只可能是數字與逗號；資料庫欄位不強制格式，渲染前先清乾淨 */
 function safeCode(c){return String(c==null?"":c).replace(/\D/g,"").slice(0,20);}
 function digits(c){return String(c==null?"":c).replace(/\D/g,"");}
+/* 玩家名稱可能含 FGO 色碼標記（[ffff00]／[o]／[g]／[-] 等），顯示前清掉。原始值仍保存在 DB */
+function cleanName(s){return String(s==null?"":s).replace(/\[(?:[0-9a-fA-F]{6}|[a-zA-Z]{1,4}|-)\]/g,"").trim();}
 /* 每筆登記的專屬分享連結：?code=數字（不含逗號，貼到 Discord/巴哈最乾淨） */
 function shareUrl(code){return location.origin+location.pathname+"?code="+digits(code);}
 function shareEntry(code){const url=shareUrl(code);
@@ -634,6 +638,10 @@ function validCode(c){const d=(c||"").replace(/\D/g,"");return d.length>=9&&d.le
 /* server 只可能是這四個；DB 若被塞入其他值，一律正規化成 "?"，
    避免未跳脫的 badge / inline onclick 變成 stored XSS 的注入點 */
 const SRV_OK=["JP","NA","TW","CN"];
+/* 有模擬器 worker、支援自動匯入助戰的伺服器（台服 instance0 + 日服 instance2）。
+   國服(CN)/美服(NA) 無 worker → 需自行編排助戰板；提示文字要明確排除它們。 */
+const WORKER_SERVERS=["TW","JP"];
+function isAutoServer(s){return WORKER_SERVERS.includes(s);}
 function safeSrv(s){return SRV_OK.includes(s)?s:"?";}
 /* 查不到就回 "?"，絕不把傳入值原樣吐回 HTML */
 function srvName(code){const k="srv_"+String(code).toLowerCase();
@@ -1003,15 +1011,15 @@ document.querySelectorAll("#statusToggle .st-btn").forEach(b=>b.onclick=()=>{reg
 $("recruitFilter").onclick=()=>{onlyRecruiting=!onlyRecruiting;$("recruitFilter").classList.toggle("active",onlyRecruiting);rerender();};
 $("grandFilter").onclick=()=>{onlyGrand=!onlyGrand;$("grandFilter").classList.toggle("active",onlyGrand);rerender();};
 $("sortSel").onchange=e=>{SORT=e.target.value;rerender();};
-function updateServerNote(){const el=$("serverNote");if(!el)return;const tw=$("server").value==="TW";el.textContent=t(tw?"note_auto_tw":"note_manual");el.style.color=tw?"#4caf50":"#e0a030";}
+function updateServerNote(){const el=$("serverNote");if(!el)return;const auto=isAutoServer($("server").value);el.textContent=t(auto?"note_auto_tw":"note_manual");el.style.color=auto?"#4caf50":"#e0a030";}
 $("saveBtn").onclick=async()=>{
   if(!CURRENT_USER){toast(t("need_login"));return;}
   const code=$("friendCode").value.replace(/\D/g,"");   /* 只存數字，不加逗號 */
   if(!validCode(code)){toast(t("toast_need_code"));return;}
   const boards={};let total=0;BOARDS.forEach(b=>{const bd=boardDraft[b.key];if(bd&&Object.keys(bd).length){boards[b.key]=JSON.parse(JSON.stringify(bd));total+=Object.keys(bd).length;}});
   const prev=CURRENT_USER?MINE.find(e=>e.server===$("server").value):null;
-  /* 非台服：目前無自動匯入，維持必填助戰板 */
-  if(!total&&$("server").value!=="TW"){toast(t("toast_manual_only"));return;}
+  /* 無 worker 的伺服器（國服/美服）：無自動匯入，維持必填助戰板 */
+  if(!total&&!isAutoServer($("server").value)){toast(t("toast_manual_only"));return;}
   /* 手動模式（有填助戰）才做覆蓋確認，避免蓋掉既有 */
   if(total&&prev&&prev.id!==LOADED_FROM){
     let had=0;Object.keys(prev.boards||{}).forEach(k=>{const bd=prev.boards[k];if(bd&&typeof bd==="object")had+=Object.keys(bd).length;});
@@ -1035,10 +1043,10 @@ function slotsOf(entry){const out=[];const boards=entry.boards||{};
         skills:Array.isArray(d.skills)?d.skills:[],as:Array.isArray(d.as)?d.as:[],
         boardKey:b.key,boardCat:b.cat,boardLabel:boardLabelOf(b),slotKey:sl.key,slotLabel:slotLabelOf(sl)});});});
   return out;}
-fmtCode($("q1code"));
-$("q1btn").onclick=async()=>{const code=$("q1code").value.trim();if(!validCode(code)){toast(t("toast_need_code"));return;}clearChips();
-  lastQueryLabel=code;MODE="search";lastDesc=t("desc_code")+" "+code;
-  try{lastCards=(await rpc("fgo_by_code",{p_code:digits(code)})).map(normCard);}   // 後端比對數字，逗號格式不同也找得到
+// 第一個搜尋：好友編號 或 玩家名稱都可查（不再 fmtCode 強制數字、不再只送 digits）
+$("q1btn").onclick=async()=>{const q=$("q1code").value.trim();if(!q){toast(t("toast_need_code"));return;}clearChips();
+  lastQueryLabel=q;MODE="search";lastDesc=t("desc_code")+" "+q;
+  try{lastCards=(await rpc("fgo_by_code",{p_code:q})).map(normCard);}   // 後端：純數字比編號、否則比玩家名稱
   catch(e){console.error(e);lastCards=[];toast(t("err_load"));}
   paint(false);};
 let q2Servant=null,q3Servant=null,q3CE=null;
@@ -1229,6 +1237,7 @@ function previewTitle(sl){const slot=SLOT_BY_KEY[sl.slotKey];const lbl=slot?slot
 /* 一張登記卡：用後端預覽 preview（前 12 張頭像 + 名稱），不含完整 boards；展開時才單筆取 */
 function cardHtml(e){
   const slots=e.preview||[];const cnt=e.slotCount||slots.length;const mine=e.isMine;const liked=MYLIKES.has(e.id);
+  const pname=cleanName(e.userName||"");
   return `<div class="entry${mine?' mine':''}${e.full?' full':''}"><div class="top">
     <span class="code" title="copy" onclick="copyCode('${safeCode(e.friendCode)}')">${escapeHtml(safeCode(e.friendCode))}</span>
     <span class="badge srv">${srvName(e.server)}</span>
@@ -1236,6 +1245,7 @@ function cardHtml(e){
     ${mine?`<span class="badge mine-badge">⭐ ${t("your_entry")}</span>`:''}
     <button class="like-btn${liked?' liked':''}" data-id="${e.id}" onclick="likeEntry('${e.id}')" title="${t("like")}">👍 <span>${e.likes||0}</span></button>
     <span class="entry-actions"><button class="more-btn" onclick="toggleMenu(event,this)" title="${t('more_actions')}">⋯</button><div class="more-menu"><div class="mi" onclick="shareEntry('${safeCode(e.friendCode)}')">🔗 ${t("share_link")}</div>${mine?'':`<div class="mi" onclick="openReport('${e.id}','${safeCode(e.friendCode)}','${e.server}')">🚩 ${t("report")}</div><div class="mi" onclick="block('${safeCode(e.friendCode)}')">🚫 ${t("bl_block")}</div>`}</div></span></div>
+    ${pname?`<div class="entry-player" title="${t('player_name')}">👤 ${escapeHtml(pname)}${e.userLv?` · Lv${e.userLv}`:''}</div>`:''}
     ${e.note?`<div class="entry-note">📝 ${escapeHtml(e.note)}</div>`:''}
     ${e.updatedAt?`<div class="entry-updated">🕒 ${t("updated_lbl")} ${timeAgo(e.updatedAt)}</div>`:''}
     ${slots.length?`<div class="preview" onclick="toggleBoard('${e.id}',this.nextElementSibling)">${slots.slice(0,12).map(sl=>`<img class="pav" src="${safeUrl(sl.face)}" title="${escapeHtml(previewTitle(sl))}" loading="lazy" onerror="this.style.display='none'">`).join("")}${cnt>12?`<span class="pmore">+${cnt-12}</span>`:''}</div>`:''}
